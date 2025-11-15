@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, 'claude/**' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  android-build:
+    name: Android Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      working-directory: ./android
+      run: chmod +x gradlew
+
+    - name: Build with Gradle
+      working-directory: ./android
+      run: ./gradlew assembleDebug
+
+    - name: Run unit tests
+      working-directory: ./android
+      run: ./gradlew test
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-debug
+        path: android/app/build/outputs/apk/debug/app-debug.apk
+
+  mock-server-test:
+    name: Test Mock FlashAir Server
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      working-directory: ./tools/mock-flashair
+      run: pip install flask
+
+    - name: Start mock server
+      working-directory: ./tools/mock-flashair
+      run: |
+        python server.py &
+        sleep 3
+
+    - name: Test CSV endpoint
+      run: |
+        curl -f http://localhost:8080/command.cgi?op=100&DIR=/DCIM
+
+    - name: Test config endpoint
+      run: |
+        curl -f http://localhost:8080/command.cgi?op=104
+
+  lint:
+    name: Lint Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      working-directory: ./android
+      run: chmod +x gradlew
+
+    - name: Run Android Lint
+      working-directory: ./android
+      run: ./gradlew lint

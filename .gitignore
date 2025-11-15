@@ -1,0 +1,54 @@
+# macOS
+.DS_Store
+
+# iOS
+ios/FlashAirSync/Build/
+ios/FlashAirSync/DerivedData/
+ios/FlashAirSync/*.xcodeproj/project.xcworkspace/xcuserdata/
+ios/FlashAirSync/*.xcodeproj/xcuserdata/
+ios/FlashAirSync/*.xcworkspace/xcuserdata/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/*.iml
+android/.externalNativeBuild
+android/.cxx
+
+# Gradle
+android/gradle/
+!android/gradle/wrapper/gradle-wrapper.properties
+
+# Python
+tools/mock-flashair/__pycache__/
+tools/mock-flashair/*.pyc
+tools/mock-flashair/.venv/
+tools/mock-flashair/venv/
+
+# Test data (keep structure, ignore large test files if added)
+tools/mock-flashair/test-data/**/*.JPG
+tools/mock-flashair/test-data/**/*.MP4
+!tools/mock-flashair/test-data/DCIM/100CANON/.gitkeep
+
+# Logs
+*.log
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

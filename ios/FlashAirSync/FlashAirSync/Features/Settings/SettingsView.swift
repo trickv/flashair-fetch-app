@@ -1,0 +1,193 @@
+import SwiftUI
+
+struct SettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var settings = UserDefaults.standard.syncSettings
+    @State private var showingResetAlert = false
+    @State private var showingLogsSheet = false
+
+    var body: some View {
+        NavigationView {
+            Form {
+                // Network settings
+                Section {
+                    TextField("SSID", text: $settings.ssid)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+
+                    TextField("Passphrase", text: $settings.passphrase)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+
+                    TextField("Host", text: $settings.host)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                        .keyboardType(.URL)
+                } header: {
+                    Text("FlashAir Network")
+                } footer: {
+                    Text("Default: flashair / 12345678 / http://192.168.0.1")
+                }
+
+                // File type filter
+                Section {
+                    ForEach(availableExtensions, id: \.self) { ext in
+                        Toggle(ext.uppercased(), isOn: binding(for: ext))
+                    }
+                } header: {
+                    Text("File Types")
+                } footer: {
+                    Text("Select which file types to import")
+                }
+
+                // Performance settings
+                Section {
+                    Stepper("Concurrent Downloads: \(settings.concurrentDownloads)", value: $settings.concurrentDownloads, in: 1...3)
+
+                    Stepper("Max File Size: \(settings.maxFileSizeMB) MB", value: $settings.maxFileSizeMB, in: 10...5000, step: 50)
+                } header: {
+                    Text("Performance")
+                } footer: {
+                    Text("Higher concurrency may be faster but uses more battery")
+                }
+
+                // Advanced actions
+                Section {
+                    Button(role: .destructive) {
+                        showingResetAlert = true
+                    } label: {
+                        Label("Reset Sync Index", systemImage: "trash")
+                    }
+
+                    Button {
+                        showingLogsSheet = true
+                    } label: {
+                        Label("View Logs", systemImage: "doc.text")
+                    }
+                } header: {
+                    Text("Advanced")
+                } footer: {
+                    Text("Resetting the index will cause all files to be re-imported on the next sync")
+                }
+
+                // About section
+                Section {
+                    HStack {
+                        Text("Version")
+                        Spacer()
+                        Text(appVersion)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Link(destination: URL(string: "https://github.com/trickv/flashair-fetch-app")!) {
+                        Label("View on GitHub", systemImage: "link")
+                    }
+                } header: {
+                    Text("About")
+                }
+            }
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        saveSettings()
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+            .alert("Reset Sync Index?", isPresented: $showingResetAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Reset", role: .destructive) {
+                    resetIndex()
+                }
+            } message: {
+                Text("This will cause all files to be re-imported on the next sync. Already imported photos will remain in your library.")
+            }
+            .sheet(isPresented: $showingLogsSheet) {
+                LogsView()
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    private let availableExtensions = ["jpg", "jpeg", "png", "heic", "mp4", "mov"]
+
+    private func binding(for extension: String) -> Binding<Bool> {
+        Binding(
+            get: { settings.fileExtensions.contains(`extension`) },
+            set: { enabled in
+                if enabled {
+                    if !settings.fileExtensions.contains(`extension`) {
+                        settings.fileExtensions.append(`extension`)
+                    }
+                } else {
+                    settings.fileExtensions.removeAll { $0 == `extension` }
+                }
+            }
+        )
+    }
+
+    private func saveSettings() {
+        UserDefaults.standard.syncSettings = settings
+    }
+
+    private func resetIndex() {
+        Task {
+            let engine = SyncEngine(settings: settings)
+            await engine.resetIndex()
+        }
+    }
+
+    private var appVersion: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "\(version) (\(build))"
+    }
+}
+
+// MARK: - Logs View
+
+struct LogsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var logs: String = ""
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                Text(logs)
+                    .font(.system(.caption, design: .monospaced))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+            }
+            .navigationTitle("Logs")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    ShareLink(item: logs)
+                }
+            }
+            .task {
+                logs = await Logger.shared.exportLogs()
+            }
+        }
+    }
+}
+
+#Preview {
+    SettingsView()
+}
