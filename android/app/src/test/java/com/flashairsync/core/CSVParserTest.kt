@@ -52,7 +52,7 @@ class CSVParserTest {
     @Test
     fun testFATDateTimeDecoding() {
         // Test date: 2018-09-20
-        val date = 19588
+        val date = 19764  // (year:38 << 9) | (month:9 << 5) | (day:20) = 19764
         // Test time: 16:56:00
         val time = 34560
 
