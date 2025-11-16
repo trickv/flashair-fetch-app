@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.5"
+        android:scaleY="0.5"
+        android:translateX="27"
+        android:translateY="27">
+        <!-- WiFi Icon -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M54,62C50.7,62 48,64.7 48,68C48,71.3 50.7,74 54,74C57.3,74 60,71.3 60,68C60,64.7 57.3,62 54,62ZM54,26C39.1,26 25.7,31.8 15.5,41.1L20.6,46.2C29.5,38.1 41.1,33 54,33C66.9,33 78.5,38.1 87.4,46.2L92.5,41.1C82.3,31.8 68.9,26 54,26ZM54,44C45.3,44 37.3,47.3 31.1,52.6L36.2,57.7C41.1,53.4 47.3,51 54,51C60.7,51 66.9,53.4 71.8,57.7L76.9,52.6C70.7,47.3 62.7,44 54,44Z" />
+    </group>
+</vector>
