@@ -28,9 +28,10 @@ android/*.iml
 android/.externalNativeBuild
 android/.cxx
 
-# Gradle
-android/gradle/
-!android/gradle/wrapper/gradle-wrapper.properties
+# Gradle (exclude caches but keep wrapper)
+android/.gradle/
+android/gradle/*
+!android/gradle/wrapper/
 
 # Python
 tools/mock-flashair/__pycache__/
