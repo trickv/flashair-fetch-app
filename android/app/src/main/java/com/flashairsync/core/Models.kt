@@ -162,7 +162,7 @@ data class ImportResult(
  * FlashAir-specific errors
  */
 sealed class FlashAirError : Exception() {
-    data class NetworkError(val cause: Throwable) : FlashAirError() {
+    data class NetworkError(override val cause: Throwable) : FlashAirError() {
         override val message: String = "Network error: ${cause.message}"
     }
 
