@@ -1,5 +1,20 @@
 # FlashAir Sync
 
+> [!WARNING]
+> **⚠️ VIBE-CODED PROJECT - EARLY DEVELOPMENT ⚠️**
+>
+> This project was generated through AI-assisted development ("vibe coding") and is currently in **Milestone 1 (M1)** of a 4-milestone roadmap. The codebase is **largely untested** and should be considered **experimental**.
+>
+> **Current Status:**
+> - ✅ Project scaffolding complete
+> - ✅ Core CSV parsing and HTTP client implemented
+> - ⚠️ **Not tested on real FlashAir hardware**
+> - ⚠️ **iOS app requires Xcode project setup (source files only)**
+> - ⚠️ **Android sync functionality not yet wired**
+> - ⚠️ **No end-to-end integration tests**
+>
+> **Use at your own risk.** Expect bugs, incomplete features, and breaking changes.
+
 A robust, cross-platform mobile application for importing photos and videos from Toshiba FlashAir SD cards to iOS and Android devices.
 
 ## Features
