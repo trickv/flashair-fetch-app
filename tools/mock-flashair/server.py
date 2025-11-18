@@ -1,4 +1,10 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
+# /// script
+# requires-python = ">=3.8"
+# dependencies = [
+#     "flask>=3.0.0",
+# ]
+# ///
 """
 Mock FlashAir HTTP Server
 
@@ -10,6 +16,8 @@ Serves:
 - command.cgi?op=104 (card configuration)
 
 Usage:
+    uv run server.py [--port 8080] [--host 0.0.0.0]
+    # or
     python server.py [--port 8080] [--host 0.0.0.0]
 """
 
