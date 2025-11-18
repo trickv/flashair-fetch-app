@@ -15,6 +15,9 @@ import androidx.compose.ui.unit.dp
 import com.flashairsync.core.FlashAirClient
 import kotlinx.coroutines.launch
 
+// Build version - update this with each release
+private const val BUILD_VERSION = "dev-build"
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -189,7 +192,7 @@ fun ImportScreen() {
             )
 
             Text(
-                text = "Build: ${BuildConfig.GIT_COMMIT_ID}",
+                text = "Build: $BUILD_VERSION",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

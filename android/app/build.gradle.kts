@@ -18,12 +18,6 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
-
-        // Add git commit ID to BuildConfig
-        val gitCommitId = providers.exec {
-            commandLine("git", "rev-parse", "--short", "HEAD")
-        }.standardOutput.asText.get().trim()
-        buildConfigField("String", "GIT_COMMIT_ID", "\"$gitCommitId\"")
     }
 
     buildTypes {
@@ -47,7 +41,6 @@ android {
 
     buildFeatures {
         compose = true
-        buildConfig = true
     }
 
     composeOptions {
