@@ -10,13 +10,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.flashairsync.core.FlashAirClient
 import kotlinx.coroutines.launch
-
-// Build version - update this with each release
-private const val BUILD_VERSION = "dev-build"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,9 +49,11 @@ fun ImportScreen() {
     var error by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     // Development host - 10.0.2.2 routes to host machine's localhost in Android emulator
     val host = "http://10.0.2.2:8080"
+    val gitCommitId = context.getString(R.string.git_commit_id)
 
     Scaffold(
         topBar = {
@@ -192,7 +192,7 @@ fun ImportScreen() {
             )
 
             Text(
-                text = "Build: $BUILD_VERSION",
+                text = "Build: $gitCommitId",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

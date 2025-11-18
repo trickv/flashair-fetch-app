@@ -18,6 +18,12 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        // Add git commit ID as a string resource
+        val gitCommitId = providers.exec {
+            commandLine("git", "rev-parse", "--short", "HEAD")
+        }.standardOutput.asText.get().trim()
+        resValue("string", "git_commit_id", gitCommitId)
     }
 
     buildTypes {
