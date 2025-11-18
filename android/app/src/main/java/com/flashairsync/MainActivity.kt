@@ -187,6 +187,14 @@ fun ImportScreen() {
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 16.dp)
             )
+
+            Text(
+                text = "Build: ${BuildConfig.GIT_COMMIT_ID}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 4.dp)
+            )
         }
     }
 }
