@@ -53,12 +53,20 @@ class SyncEngine(
         val startTime = System.currentTimeMillis()
 
         try {
-            // Step 1: Connect to WiFi
-            _syncState.value = SyncState.ConnectingWiFi
-            Log.d(TAG, "Connecting to WiFi: ${settings.ssid}")
+            // Step 1: Connect to WiFi (skip for localhost/mock server)
+            val isLocalhost = settings.host.contains("localhost") ||
+                             settings.host.contains("127.0.0.1") ||
+                             settings.host.contains("10.0.2.2")
 
-            val network = wifiConnector.connect(settings.ssid, settings.passphrase)
-            _syncState.value = SyncState.WiFiConnected(network)
+            if (!isLocalhost) {
+                _syncState.value = SyncState.ConnectingWiFi
+                Log.d(TAG, "Connecting to WiFi: ${settings.ssid}")
+
+                val network = wifiConnector.connect(settings.ssid, settings.passphrase)
+                _syncState.value = SyncState.WiFiConnected(network)
+            } else {
+                Log.d(TAG, "Skipping WiFi connection for localhost/mock server")
+            }
 
             // Step 2: Discover files
             _syncState.value = SyncState.Discovering
