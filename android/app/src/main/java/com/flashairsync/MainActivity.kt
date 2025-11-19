@@ -106,13 +106,17 @@ fun ImportScreen() {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    // Development settings - 10.0.2.2 routes to host machine's localhost in Android emulator
+    // Load settings from build configuration (debug = mock server, release = real FlashAir)
     val settings = remember {
         SyncSettings(
-            ssid = "flashair",
-            passphrase = "12345678",
-            host = "http://10.0.2.2:8080"
+            ssid = context.getString(R.string.flashair_ssid),
+            passphrase = context.getString(R.string.flashair_passphrase),
+            host = context.getString(R.string.flashair_host)
         )
+    }
+
+    val useMockServer = remember {
+        context.resources.getBoolean(R.bool.use_mock_server)
     }
 
     val syncEngine = remember {
@@ -297,6 +301,11 @@ fun ImportScreen() {
             // Error display
             if (syncState is SyncState.Failed) {
                 val error = (syncState as SyncState.Failed).error
+                val errorHint = if (useMockServer) {
+                    "\n\nMake sure mock server is running at:\n${settings.host}"
+                } else {
+                    "\n\nMake sure:\n• FlashAir card is powered on\n• Device is in range\n• SSID: ${settings.ssid}"
+                }
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -306,7 +315,7 @@ fun ImportScreen() {
                     )
                 ) {
                     Text(
-                        text = "❌ Error: $error\n\nMake sure mock server is running at:\n${settings.host}",
+                        text = "❌ Error: $error$errorHint",
                         modifier = Modifier.padding(16.dp),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onErrorContainer
@@ -318,11 +327,19 @@ fun ImportScreen() {
 
             // Footer
             Text(
-                text = "Dev Host: ${settings.host}",
+                text = if (useMockServer) "Mode: Mock Server" else "Mode: Real FlashAir",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (useMockServer) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 16.dp)
+            )
+
+            Text(
+                text = "Host: ${settings.host}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 16.dp)
+                modifier = Modifier.padding(top = 4.dp)
             )
 
             Text(

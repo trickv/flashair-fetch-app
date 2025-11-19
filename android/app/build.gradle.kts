@@ -27,7 +27,21 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Mock server configuration for emulator testing
+            resValue("string", "flashair_host", "http://10.0.2.2:8080")
+            resValue("string", "flashair_ssid", "flashair-mock")
+            resValue("string", "flashair_passphrase", "12345678")
+            resValue("bool", "use_mock_server", "true")
+        }
+
         release {
+            // Real FlashAir configuration
+            resValue("string", "flashair_host", "http://192.168.0.1")
+            resValue("string", "flashair_ssid", "flashair")
+            resValue("string", "flashair_passphrase", "12345678")
+            resValue("bool", "use_mock_server", "false")
+
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
