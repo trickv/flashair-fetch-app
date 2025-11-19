@@ -216,7 +216,6 @@ fun ImportScreen() {
                                 }
                             }
                         },
-                        enabled = syncState !is SyncState.Completed && syncState !is SyncState.Failed,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)

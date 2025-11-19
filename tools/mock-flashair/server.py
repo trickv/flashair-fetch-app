@@ -3,6 +3,7 @@
 # requires-python = ">=3.8"
 # dependencies = [
 #     "flask>=3.0.0",
+#     "pillow>=10.0.0",
 # ]
 # ///
 """
@@ -14,6 +15,8 @@ Serves:
 - command.cgi?op=100 (directory listing in CSV format)
 - Direct file downloads from test-data/ directory
 - command.cgi?op=104 (card configuration)
+- Dynamically generates test images with filename rendered as text
+- Simulates "taking photos" by adding new images on each sync
 
 Usage:
     uv run server.py [--port 8080] [--host 0.0.0.0]
@@ -27,11 +30,17 @@ import time
 from pathlib import Path
 from datetime import datetime
 from flask import Flask, request, send_file, Response
+from PIL import Image, ImageDraw, ImageFont
+import io
 
 app = Flask(__name__)
 
 # Base directory for test files
 TEST_DATA_DIR = Path(__file__).parent / "test-data"
+
+# State tracking for simulating "taking photos"
+SYNC_COUNT = 0
+BASE_IMAGE_COUNT = 3  # Start with 3 images
 
 
 def fat_encode_date(dt: datetime) -> int:
@@ -62,9 +71,67 @@ def fat_encode_time(dt: datetime) -> int:
     return (hour << 11) | (minute << 5) | second
 
 
+def generate_test_image(filename: str, width: int = 800, height: int = 600) -> bytes:
+    """
+    Generate a test image with the filename rendered as text.
+
+    Args:
+        filename: The filename to render in the image
+        width: Image width in pixels
+        height: Image height in pixels
+
+    Returns:
+        JPEG image data as bytes
+    """
+    # Create a new image with a gradient background
+    image = Image.new('RGB', (width, height), color=(240, 240, 240))
+    draw = ImageDraw.Draw(image)
+
+    # Draw gradient background
+    for y in range(height):
+        color_value = int(200 + (y / height) * 55)
+        draw.rectangle([(0, y), (width, y+1)], fill=(color_value, color_value, 255))
+
+    # Try to load a font, fall back to default if not available
+    try:
+        font_large = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 60)
+        font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 30)
+    except:
+        font_large = ImageFont.load_default()
+        font_small = ImageFont.load_default()
+
+    # Draw filename in center
+    text = filename
+    bbox = draw.textbbox((0, 0), text, font=font_large)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    x = (width - text_width) // 2
+    y = (height - text_height) // 2
+
+    # Draw shadow
+    draw.text((x+2, y+2), text, font=font_large, fill=(0, 0, 0, 128))
+    # Draw main text
+    draw.text((x, y), text, font=font_large, fill=(50, 50, 50))
+
+    # Draw "Mock FlashAir Test Image" at bottom
+    footer_text = "Mock FlashAir Test Image"
+    bbox = draw.textbbox((0, 0), footer_text, font=font_small)
+    footer_width = bbox[2] - bbox[0]
+    draw.text(((width - footer_width) // 2, height - 60), footer_text,
+              font=font_small, fill=(100, 100, 100))
+
+    # Save to bytes
+    buffer = io.BytesIO()
+    image.save(buffer, format='JPEG', quality=85)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
 def get_directory_csv(dir_path: str) -> str:
     """
     Generate CSV directory listing for the given path.
+
+    Dynamically generates file listings based on current image count.
 
     Args:
         dir_path: Directory path (e.g., "/DCIM" or "/DCIM/100CANON")
@@ -72,40 +139,60 @@ def get_directory_csv(dir_path: str) -> str:
     Returns:
         CSV string in FlashAir format
     """
+    global SYNC_COUNT, BASE_IMAGE_COUNT
+
     # Normalize path
     dir_path = dir_path.rstrip('/')
     if not dir_path:
         dir_path = '/'
 
-    # Map to filesystem path
-    if dir_path == '/':
-        fs_path = TEST_DATA_DIR
-    else:
-        fs_path = TEST_DATA_DIR / dir_path.lstrip('/')
-
-    if not fs_path.exists() or not fs_path.is_dir():
-        return ""  # Empty response for non-existent directories
-
     # Build CSV response
     lines = ["WLANSD_FILELIST"]
 
-    for item in sorted(fs_path.iterdir()):
-        name = item.name
-        is_dir = item.is_dir()
-
-        # Get file stats
-        stat = item.stat()
-        size = 0 if is_dir else stat.st_size
-        attribute = 16 if is_dir else 32  # 0x10 = directory, 0x20 = archive
-
-        # Get modification time
-        mtime = datetime.fromtimestamp(stat.st_mtime)
-        fat_date = fat_encode_date(mtime)
-        fat_time = fat_encode_time(mtime)
-
-        # Build CSV line: directory,name,size,attribute,date,time
-        csv_line = f"{dir_path},{name},{size},{attribute},{fat_date},{fat_time}"
+    # Handle /DCIM directory
+    if dir_path == '/DCIM':
+        # Return the 100CANON subdirectory
+        now = datetime.now()
+        fat_date = fat_encode_date(now)
+        fat_time = fat_encode_time(now)
+        csv_line = f"{dir_path},100CANON,0,16,{fat_date},{fat_time}"
         lines.append(csv_line)
+
+    # Handle /DCIM/100CANON directory - dynamically generate files
+    elif dir_path == '/DCIM/100CANON':
+        # Calculate current number of images (increases with each sync)
+        current_image_count = BASE_IMAGE_COUNT + (SYNC_COUNT * 2)  # Add 2 images per sync
+
+        now = datetime.now()
+        fat_date = fat_encode_date(now)
+        fat_time = fat_encode_time(now)
+
+        # Generate file entries
+        for i in range(1, current_image_count + 1):
+            filename = f"IMG_{i:04d}.JPG"
+            # Approximate JPEG size (will be generated dynamically)
+            size = 25000 + (i * 100)  # Vary size slightly
+            attribute = 32  # Archive file
+            csv_line = f"{dir_path},{filename},{size},{attribute},{fat_date},{fat_time}"
+            lines.append(csv_line)
+
+    # For other paths, fall back to filesystem
+    else:
+        fs_path = TEST_DATA_DIR / dir_path.lstrip('/')
+        if not fs_path.exists() or not fs_path.is_dir():
+            return ""  # Empty response for non-existent directories
+
+        for item in sorted(fs_path.iterdir()):
+            name = item.name
+            is_dir = item.is_dir()
+            stat = item.stat()
+            size = 0 if is_dir else stat.st_size
+            attribute = 16 if is_dir else 32
+            mtime = datetime.fromtimestamp(stat.st_mtime)
+            fat_date = fat_encode_date(mtime)
+            fat_time = fat_encode_time(mtime)
+            csv_line = f"{dir_path},{name},{size},{attribute},{fat_date},{fat_time}"
+            lines.append(csv_line)
 
     return "\r\n".join(lines) + "\r\n"
 
@@ -139,11 +226,29 @@ APPNETWORKKEY=12345678
 @app.route('/<path:file_path>')
 def download_file(file_path):
     """
-    Serve files directly from test-data directory.
+    Serve files - either dynamically generated test images or from filesystem.
 
     Supports partial downloads via Range header.
     """
-    # Map to filesystem path
+    global SYNC_COUNT
+
+    # Check if this is a dynamically generated test image
+    if file_path.startswith('DCIM/100CANON/IMG_') and file_path.endswith('.JPG'):
+        filename = file_path.split('/')[-1]
+
+        # Increment sync count after first file download (simulates "taking photos")
+        # This happens once per sync session
+        if filename == "IMG_0001.JPG":
+            SYNC_COUNT += 1
+            print(f"[Mock Server] Sync #{SYNC_COUNT} detected - will add 2 new photos for next sync")
+
+        # Generate the image dynamically
+        image_data = generate_test_image(filename)
+
+        # Return the generated image
+        return Response(image_data, mimetype='image/jpeg')
+
+    # Fall back to filesystem for other files
     fs_path = TEST_DATA_DIR / file_path.lstrip('/')
 
     if not fs_path.exists() or fs_path.is_dir():
@@ -240,6 +345,12 @@ Available endpoints:
   • GET /command.cgi?op=100&DIR=/DCIM   (directory listing)
   • GET /command.cgi?op=104             (card config)
   • GET /DCIM/100CANON/IMG_0001.JPG     (file download)
+
+Dynamic Features:
+  • Starts with {BASE_IMAGE_COUNT} test images
+  • Each sync adds 2 new images (simulates "taking photos")
+  • Images are generated on-the-fly with filename rendered as text
+  • Test incremental sync by running multiple syncs!
 
 Test data location: {TEST_DATA_DIR}
 
