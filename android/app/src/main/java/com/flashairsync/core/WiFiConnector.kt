@@ -9,7 +9,6 @@ import android.net.wifi.WifiNetworkSpecifier
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException

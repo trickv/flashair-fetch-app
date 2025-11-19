@@ -79,7 +79,7 @@ class MediaStoreWriter(private val context: Context) {
             put(MediaStore.MediaColumns.MIME_TYPE, detectedMimeType)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.MediaColumns.RELATIVE_PATH, "$Environment.DIRECTORY_PICTURES/$relativePath")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/$relativePath")
                 put(MediaStore.MediaColumns.IS_PENDING, 1) // Mark as pending while writing
             }
         }
