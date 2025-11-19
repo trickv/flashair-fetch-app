@@ -65,6 +65,7 @@ class FlashAirClient(private val host: String) {
     ): List<DirectoryEntry> = withContext(Dispatchers.IO) {
         val allFiles = mutableListOf<DirectoryEntry>()
         val directoriesToVisit = mutableListOf(rootPath)
+        var isFirstDirectory = true
 
         while (directoriesToVisit.isNotEmpty()) {
             val currentDir = directoriesToVisit.removeFirst()
@@ -88,7 +89,15 @@ class FlashAirClient(private val host: String) {
                         }
                     }
                 }
+
+                isFirstDirectory = false
             } catch (e: Exception) {
+                // If we can't list the root directory, that's a hard error
+                if (isFirstDirectory) {
+                    Log.e(TAG, "Failed to connect or list root directory $currentDir: ${e.message}")
+                    throw e
+                }
+                // For subdirectories, log warning and continue (network may have dropped mid-sync)
                 Log.w(TAG, "Failed to list directory $currentDir: ${e.message}")
             }
         }
