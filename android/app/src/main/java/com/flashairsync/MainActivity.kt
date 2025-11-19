@@ -180,7 +180,7 @@ fun ImportScreen() {
             // Progress indicator
             if (syncState.isActive) {
                 LinearProgressIndicator(
-                    progress = { syncState.progressPercent },
+                    progress = syncState.progressPercent,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 16.dp)
