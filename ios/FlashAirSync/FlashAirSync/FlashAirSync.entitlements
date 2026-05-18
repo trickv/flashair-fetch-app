@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+		Hotspot Configuration: required by WiFiJoiner to call
+		NEHotspotConfiguration and join the FlashAir card's WiFi network.
+		Apple gates this capability — you must request it for the bundle ID
+		in the Apple Developer Portal (Certificates → Identifiers → your
+		app ID → Capabilities → Hotspot Configuration → Enable) before the
+		entitlement actually grants the API at runtime. Local development
+		builds work without approval; archives for TestFlight/App Store
+		will not.
+	-->
+	<key>com.apple.developer.networking.HotspotConfiguration</key>
+	<true/>
+</dict>
+</plist>

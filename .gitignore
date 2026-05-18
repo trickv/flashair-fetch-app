@@ -4,9 +4,9 @@
 # iOS
 ios/FlashAirSync/Build/
 ios/FlashAirSync/DerivedData/
-ios/FlashAirSync/*.xcodeproj/project.xcworkspace/xcuserdata/
-ios/FlashAirSync/*.xcodeproj/xcuserdata/
-ios/FlashAirSync/*.xcworkspace/xcuserdata/
+# .xcodeproj is generated from project.yml via XcodeGen; never commit it.
+ios/FlashAirSync/*.xcodeproj/
+ios/FlashAirSync/*.xcworkspace/
 *.pbxuser
 *.mode1v3
 *.mode2v3

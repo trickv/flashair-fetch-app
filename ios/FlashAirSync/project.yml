@@ -1,0 +1,69 @@
+# XcodeGen project definition.
+#
+# To generate FlashAirSync.xcodeproj:
+#   brew install xcodegen
+#   cd ios/FlashAirSync && xcodegen generate
+#
+# The generated .xcodeproj is intentionally NOT committed — regenerate
+# from this file. Change targets/settings here, not in Xcode's UI.
+#
+# Before first build:
+#   1. Open FlashAirSync.xcodeproj in Xcode.
+#   2. Select the FlashAirSync target → Signing & Capabilities → set "Team"
+#      to your Apple Developer team. Without this, the build will fail
+#      with a "Signing for FlashAirSync requires a development team" error.
+#   3. (Optional) Change PRODUCT_BUNDLE_IDENTIFIER below if `com.flashairsync`
+#      conflicts with another app in your Apple Developer account.
+#
+# Hotspot Configuration entitlement: declared in FlashAirSync.entitlements.
+# Requires Apple approval per app — request via the "Network Extensions"
+# / "Hotspot Configuration" capability in Apple Developer Portal before
+# submitting to TestFlight/App Store. Local development works without it.
+
+name: FlashAirSync
+
+options:
+  deploymentTarget:
+    iOS: "15.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+    # Set DEVELOPMENT_TEAM in Xcode's Signing & Capabilities tab —
+    # don't commit your team ID here.
+
+targets:
+  FlashAirSync:
+    type: application
+    platform: iOS
+    sources:
+      - path: FlashAirSync
+        excludes:
+          - "Info.plist"
+          - "FlashAirSync.entitlements"
+    info:
+      path: FlashAirSync/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.flashairsync
+        PRODUCT_NAME: FlashAirSync
+        CODE_SIGN_ENTITLEMENTS: FlashAirSync/FlashAirSync.entitlements
+        TARGETED_DEVICE_FAMILY: "1,2"  # iPhone + iPad
+        SUPPORTS_MACCATALYST: false
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+
+  FlashAirSyncTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: FlashAirSyncTests
+    dependencies:
+      - target: FlashAirSync
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.flashairsync.tests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/FlashAirSync.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FlashAirSync"
