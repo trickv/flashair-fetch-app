@@ -43,6 +43,7 @@ tools/mock-flashair/venv/
 tools/mock-flashair/test-data/**/*.JPG
 tools/mock-flashair/test-data/**/*.MP4
 !tools/mock-flashair/test-data/DCIM/100CANON/.gitkeep
+!tools/mock-flashair/test-data/DCIM/100CANON/IMG_*.JPG
 
 # Logs
 *.log
