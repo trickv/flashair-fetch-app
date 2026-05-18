@@ -1,23 +1,29 @@
 # Development Guide
 
-## Current Status (Milestone 1 Complete ✓)
+## Current Status (M2 Drafted, Unvalidated)
 
-**Working Features:**
+**Working / Verified:**
 - ✅ Android app scaffold with Jetpack Compose UI
 - ✅ FlashAirClient HTTP implementation with CSV parsing
-- ✅ Mock FlashAir server for testing
-- ✅ M1: Connect to FlashAir and list /DCIM directory
+- ✅ Mock FlashAir server for testing (M1 endpoints — see regression below)
+- ✅ M1: Connect to FlashAir and list /DCIM directory (verified on emulator + mock)
 - ✅ FAT datetime encoding/decoding
 - ✅ Network security config for cleartext HTTP
 - ✅ Git commit hash displayed in app footer
-- ✅ CI pipeline with Android build & test
+- ✅ Android build & unit tests green on CI
+
+**Merged but Not Yet Validated End-to-End (M2):**
+- ⚠️ `WiFiConnector` — Android 10+ `WifiNetworkSpecifier` + permission flows (code present, not exercised against a real network)
+- ⚠️ `MediaStoreWriter` — writes to `Pictures/FlashAirImport/`
+- ⚠️ `SyncEngine` — wires `FlashAirClient` + `SyncIndex` + `MediaStoreWriter` together with recursive walk, progress, retry-on-error
+- ⚠️ Debug/release **build variants**: `debug` points at the mock server (`10.0.2.2:8080`) and skips the WiFi join; `release` points at the real FlashAir (`192.168.0.1`, SSID `flashair`). See `android/app/build.gradle.kts` `buildTypes`.
+
+**Known Regressions on `main`:**
+- ❌ Mock-server CI step `Test config endpoint` (`op=104`) fails after M2's `tools/mock-flashair/server.py` changes. Android build/test still pass.
 
 **Not Yet Implemented:**
 - iOS app (scaffolded but untested)
-- WiFi network joining
-- MediaStore integration
-- Full sync engine
-- M2, M3, M4 features
+- M3 (resilience), M4 (settings, logs export, WebDAV)
 
 ## Quick Start
 
@@ -111,14 +117,14 @@ flashair-fetch-app/
 ├── android/                    # Android app (Kotlin + Jetpack Compose)
 │   ├── app/
 │   │   └── src/main/java/com/flashairsync/
-│   │       ├── MainActivity.kt             # Main UI entry point
+│   │       ├── MainActivity.kt             # Main UI entry point (Compose, progress UI)
 │   │       └── core/
 │   │           ├── FlashAirClient.kt       # HTTP client for FlashAir API
 │   │           ├── Models.kt               # Data models & FAT encoding
-│   │           ├── SyncIndex.kt            # Deduplication state
-│   │           ├── WiFiConnector.kt        # WiFi joining (M2 - not impl)
-│   │           ├── MediaStoreWriter.kt     # Save to Android gallery (M2)
-│   │           └── SyncEngine.kt           # Main sync logic (M2)
+│   │           ├── SyncIndex.kt            # Deduplication state (path#size)
+│   │           ├── WiFiConnector.kt        # WiFi joining (drafted, unvalidated)
+│   │           ├── MediaStoreWriter.kt     # Save to Android gallery (drafted)
+│   │           └── SyncEngine.kt           # Main sync logic (drafted)
 │   └── app/src/test/java/                  # Unit tests
 ├── ios/                        # iOS app (Swift + SwiftUI) - UNTESTED
 ├── tools/mock-flashair/        # Python Flask mock server
@@ -177,30 +183,26 @@ Lint is currently non-blocking in CI (M1 scaffold). Known warnings:
 - Unused resources
 - Will be cleaned up in later milestones
 
-## Next Steps (Milestone 2)
+## Next Steps
 
-See `shared-spec/MILESTONES.md` for full plan. M2 focus:
+Note: `shared-spec/MILESTONES.md` is referenced by older docs but does not exist — the roadmap lives in `README.md`.
 
-1. **WiFi Connector** (`android/app/src/main/java/com/flashairsync/core/WiFiConnector.kt`)
-   - Implement `WifiNetworkSpecifier` for Android 10+
-   - Handle "no internet" warning dialogs
-   - Request necessary permissions
+The Android M2 code is merged but unexercised. The natural progression:
 
-2. **MediaStore Writer** (`android/app/src/main/java/com/flashairsync/core/MediaStoreWriter.kt`)
-   - Save photos/videos to `Pictures/FlashAirImport/`
-   - Request `READ_MEDIA_IMAGES/VIDEO` permissions (Android 13+)
-   - Use `MediaStore` API for scoped storage
+1. **Validate M2 end-to-end against the mock server (debug build)**
+   - Build the `debug` variant; verify it picks up `flashair_host = http://10.0.2.2:8080` and `use_mock_server = true` (so it skips the WiFi join).
+   - Run a sync from `MainActivity` and confirm files land in `Pictures/FlashAirImport/`.
+   - Re-run; confirm `SyncIndex` dedupes to 0 new files.
 
-3. **Sync Engine Integration** (`android/app/src/main/java/com/flashairsync/core/SyncEngine.kt`)
-   - Wire up WiFiConnector, FlashAirClient, SyncIndex, MediaStoreWriter
-   - Implement recursive directory walking
-   - Add progress tracking UI
-   - Handle file download and verification
+2. **Fix the mock-server `op=104` regression** in `tools/mock-flashair/server.py` so CI goes green.
 
-4. **iOS Implementation**
-   - Test in Xcode
-   - Implement WiFi joining with `NEHotspotConfiguration`
-   - Implement photo saving with `PHPhotoLibrary`
+3. **Validate against real FlashAir hardware (release build)**
+   - Use SSID `flashair`, host `http://192.168.0.1`. Permission flow for `NEARBY_WIFI_DEVICES` (Android 13+) or `ACCESS_FINE_LOCATION` (10–12) needs real-world testing.
+   - Confirm the "no internet" banner is tolerated and the per-network binding actually routes traffic to the FlashAir.
+
+4. **M3 work** — retries with backoff, cancellation, durable `SyncIndex` persistence across app restarts.
+
+5. **iOS validation** — open in Xcode, build, mirror the Android changes (`WiFiJoiner` via `NEHotspotConfiguration`, `PhotoSaver` via `PHPhotoLibrary`).
 
 ## Development Tips
 

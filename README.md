@@ -1,20 +1,19 @@
 # FlashAir Sync
 
 > [!WARNING]
-> **⚠️ VIBE-CODED PROJECT - MILESTONE 1 COMPLETE ⚠️**
+> **⚠️ VIBE-CODED PROJECT - M2 DRAFTED, UNVALIDATED ⚠️**
 >
-> This project was generated through AI-assisted development ("vibe coding") and is currently at **Milestone 1 (M1)** of a 4-milestone roadmap. The codebase is **partially tested** and should be considered **experimental**.
+> This project was generated through AI-assisted development ("vibe coding"). M1 and a first cut of M2 have been written and merged to `main`. The codebase is **partially tested** and should be considered **experimental**.
 >
-> **Current Status (Updated 2025-01-18):**
-> - ✅ **M1 Complete:** Android app can connect and list /DCIM directory
+> **Current Status (Updated 2026-05-18):**
+> - ✅ **M1:** Android app connects and lists /DCIM directory (tested against mock server)
+> - ✅ **M2 (drafted):** WiFiConnector, MediaStoreWriter, SyncEngine, progress UI, retry-on-error, debug/release build variants for mock vs. real FlashAir. Android build + unit tests pass on CI.
 > - ✅ Project scaffolding complete (Android + iOS)
-> - ✅ Core CSV parsing and HTTP client implemented
 > - ✅ Unit tests passing (FAT encoding, CSV parsing)
-> - ✅ Mock server testing validated
-> - ✅ CI pipeline operational
+> - ⚠️ **M2 has not been exercised end-to-end** — only the M1 directory-listing path has been confirmed on the emulator.
 > - ⚠️ **Not tested on real FlashAir hardware**
 > - ⚠️ **iOS app scaffolded but untested (no Xcode validation yet)**
-> - ⚠️ **WiFi joining, MediaStore, and full sync not implemented (M2)**
+> - ⚠️ **Mock-server CI regression:** the `op=104` config endpoint currently fails after M2's `server.py` changes; mock-server smoke test is red on `main`.
 >
 > **Use at your own risk.** Expect bugs, incomplete features, and breaking changes.
 > See `DEVELOPMENT.md` for build instructions and technical details.
@@ -134,7 +133,7 @@ Customize these in the app's Settings screen.
 ## Development Roadmap
 
 - [x] **M1**: Project setup, connect & list `/DCIM`
-- [ ] **M2**: Incremental import + media save + progress UI
+- [~] **M2**: Incremental import + media save + progress UI (Android: code merged, not yet validated end-to-end; iOS: not started)
 - [ ] **M3**: Resilience (retries, cancellation, state persistence)
 - [ ] **M4**: Polish (settings, logs export, optional WebDAV)
 
