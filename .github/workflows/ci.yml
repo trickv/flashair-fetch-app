@@ -46,28 +46,29 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.x'
-
-    - name: Install dependencies
-      working-directory: ./tools/mock-flashair
-      run: pip install flask
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
 
     - name: Start mock server
       working-directory: ./tools/mock-flashair
       run: |
-        python server.py &
-        sleep 3
+        uv run server.py &
+        # Wait until the server is actually listening (uv may need to resolve deps first).
+        for i in {1..30}; do
+          if curl -sf http://localhost:8080/ >/dev/null; then
+            echo "Mock server up after ${i}s"
+            exit 0
+          fi
+          sleep 1
+        done
+        echo "Mock server failed to start within 30s" >&2
+        exit 1
 
     - name: Test CSV endpoint
-      run: |
-        curl -f http://localhost:8080/command.cgi?op=100&DIR=/DCIM
+      run: curl -fsS 'http://localhost:8080/command.cgi?op=100&DIR=/DCIM' -o /dev/null
 
     - name: Test config endpoint
-      run: |
-        curl -f http://localhost:8080/command.cgi?op=104
+      run: curl -fsS 'http://localhost:8080/command.cgi?op=104' -o /dev/null
 
   lint:
     name: Lint Check
