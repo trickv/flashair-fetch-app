@@ -26,7 +26,7 @@ actor SyncEngine {
 
         // Step 1: Scan DCIM directory recursively
         print("📡 Scanning /DCIM...")
-        let allEntries = try await client.walkDirectory("/DCIM") { entry in
+        let allEntries = try await client.walkDirectory("/DCIM") { [settings] entry in
             settings.shouldImport(entry)
         }
 

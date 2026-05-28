@@ -30,9 +30,13 @@ class WiFiJoiner: ObservableObject {
             isConnected = false
             currentSSID = nil
 
-            // Map NEHotspotConfigurationError to user-friendly messages
-            if let hsError = error as? NEHotspotConfigurationError {
-                switch hsError.code {
+            // Map NEHotspotConfigurationError to user-friendly messages.
+            // NEHotspotConfigurationError is a plain NS_ENUM (not an Error type),
+            // so reconstruct the code from the bridged NSError's domain/code.
+            let nsError = error as NSError
+            if nsError.domain == NEHotspotConfigurationErrorDomain,
+               let code = NEHotspotConfigurationError(rawValue: nsError.code) {
+                switch code {
                 case .invalid:
                     throw FlashAirError.wifiConnectionFailed
                 case .invalidSSID:
