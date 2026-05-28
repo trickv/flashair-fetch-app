@@ -73,8 +73,9 @@ final class CSVParserTests: XCTestCase {
     }
 
     func testFATDateTimeDecoding() {
-        // Test date: 2018-09-20
-        let date = 19588
+        // Test date: 2018-09-20 -> (2018-1980)<<9 | 9<<5 | 20 = 19764.
+        // (The old constant 19588 actually decodes to 2018-04-04.)
+        let date = 19764
         // Breakdown: year=38 (2018), month=9, day=20
 
         // Test time: 16:56:00
@@ -127,9 +128,15 @@ final class CSVParserTests: XCTestCase {
     func testSyncSettingsDefaults() {
         let settings = SyncSettings.default
 
+        // Tests compile in Debug, where the default targets the mock server.
+        #if DEBUG
+        XCTAssertEqual(settings.ssid, "flashair-mock")
+        XCTAssertEqual(settings.host, "http://localhost:8080")
+        #else
         XCTAssertEqual(settings.ssid, "flashair")
-        XCTAssertEqual(settings.passphrase, "12345678")
         XCTAssertEqual(settings.host, "http://192.168.0.1")
+        #endif
+        XCTAssertEqual(settings.passphrase, "12345678")
         XCTAssertEqual(settings.concurrentDownloads, 1)
         XCTAssertEqual(settings.maxFileSizeMB, 2000)
         XCTAssertTrue(settings.fileExtensions.contains("jpg"))
