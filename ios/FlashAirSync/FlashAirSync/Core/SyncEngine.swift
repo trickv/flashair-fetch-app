@@ -5,6 +5,7 @@ actor SyncEngine {
     private let client: FlashAirClient
     private let index: SyncIndex
     private let settings: SyncSettings
+    private let photoSaver = PhotoSaver()
 
     private(set) var isCancelled = false
 
@@ -73,11 +74,16 @@ actor SyncEngine {
                 items[i].state = .saving
                 await progressCallback(items)
 
-                // TODO: Save to Photos library (placeholder for now)
-                // This will be implemented in PhotoSaver
-                try await Task.sleep(nanoseconds: 100_000_000) // 0.1s placeholder
+                // Save to Photos. saveToPhotos throws on failure, so the
+                // markSeen below is only reached on a successful save — a
+                // failed file stays un-indexed and will retry on next sync.
+                try await photoSaver.saveToPhotos(
+                    fileURL: localURL,
+                    originalFilename: entry.name,
+                    creationDate: entry.modifiedAt
+                )
 
-                // Mark as imported
+                // Mark as imported (only after the file is safely in Photos)
                 await index.markSeen(entry)
                 totalBytes += entry.size
                 importedCount += 1
