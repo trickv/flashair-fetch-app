@@ -22,6 +22,11 @@
 	<string>1</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>FlashAir Sync needs to connect to your FlashAir SD card over local Wi-Fi.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

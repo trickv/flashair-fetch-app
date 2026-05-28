@@ -70,6 +70,13 @@ targets:
         NSPhotoLibraryAddUsageDescription: FlashAir Sync needs access to save photos and videos imported from your FlashAir SD card.
         NSPhotoLibraryUsageDescription: FlashAir Sync needs access to save photos and videos imported from your FlashAir SD card.
         NSLocalNetworkUsageDescription: FlashAir Sync needs to connect to your FlashAir SD card over local Wi-Fi.
+        # FlashAir (and the local mock server) speak cleartext HTTP. ATS blocks
+        # that by default. NSAllowsLocalNetworking permits cleartext to localhost,
+        # .local, and IP literals (covers both the mock at localhost:8080 and the
+        # real card at 192.168.0.1) without opening arbitrary internet cleartext.
+        # iOS analog of Android's network_security_config cleartext whitelist.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.flashairsync
