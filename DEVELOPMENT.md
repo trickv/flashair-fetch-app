@@ -1,6 +1,6 @@
 # Development Guide
 
-## Current Status (M2 Drafted, Unvalidated)
+## Current Status (M2: iOS mock-validated; Android mock listing only)
 
 **Working / Verified:**
 - ✅ Android app scaffold with Jetpack Compose UI
@@ -21,8 +21,13 @@
 **Known Regressions on `main`:**
 - ❌ Mock-server CI step `Test config endpoint` (`op=104`) fails after M2's `tools/mock-flashair/server.py` changes. Android build/test still pass.
 
+**iOS — full sync validated against the mock (2026-05-27):**
+- ✅ First built & run on Xcode 26.5 (iOS 16 deployment target)
+- ✅ Full M2 sync path end-to-end in the Simulator: recursive `/DCIM` walk → download → save to Photos → `path#size` dedupe → persisted `SyncIndex`, with a clean incremental re-sync (5 → 2 → 0 new files across three runs)
+- ✅ `#if DEBUG` mock-server mode (`flashair-mock` / `localhost:8080`), `NSAllowsLocalNetworking` ATS exception, `WiFiJoiner` join+teardown wired into `ImportViewModel`
+- ⚠️ `WiFiJoiner` (NEHotspotConfiguration) never run against a real network — needs a paid Apple Developer account for the Hotspot entitlement on-device. Real-hardware validation is the next step.
+
 **Not Yet Implemented:**
-- iOS app (scaffolded but untested)
 - M3 (resilience), M4 (settings, logs export, WebDAV)
 
 ## Quick Start
@@ -126,7 +131,7 @@ flashair-fetch-app/
 │   │           ├── MediaStoreWriter.kt     # Save to Android gallery (drafted)
 │   │           └── SyncEngine.kt           # Main sync logic (drafted)
 │   └── app/src/test/java/                  # Unit tests
-├── ios/                        # iOS app (Swift + SwiftUI) - UNTESTED
+├── ios/                        # iOS app (Swift + SwiftUI) — mock-validated; real-hardware Wi-Fi pending
 ├── tools/mock-flashair/        # Python Flask mock server
 │   └── server.py
 ├── shared-spec/                # Documentation
@@ -174,8 +179,8 @@ python test_server.py
 
 **Workaround:** Use GitHub Actions CI for builds and tests. CI runs quickly (~2 minutes).
 
-### iOS App Untested
-The iOS app is fully scaffolded but has not been tested in Xcode. Should work based on Android implementation, but needs validation.
+### iOS App — Mock-Validated, Real Hardware Pending
+The iOS full sync path is validated against the mock server in the Simulator (2026-05-27). Not yet run against a real FlashAir card; the programmatic Wi-Fi join (NEHotspotConfiguration) needs a paid Apple Developer account for the Hotspot entitlement on-device. See `CLAUDE.md` "Project Status" for detail.
 
 ### Lint Warnings
 Lint is currently non-blocking in CI (M1 scaffold). Known warnings:
@@ -202,7 +207,7 @@ The Android M2 code is merged but unexercised. The natural progression:
 
 4. **M3 work** — retries with backoff, cancellation, durable `SyncIndex` persistence across app restarts.
 
-5. **iOS validation** — open in Xcode, build, mirror the Android changes (`WiFiJoiner` via `NEHotspotConfiguration`, `PhotoSaver` via `PHPhotoLibrary`).
+5. **iOS** — mock path is validated (2026-05-27). Next: real-FlashAir hardware validation (the `WiFiJoiner` join/teardown path on a device with a paid Apple Developer account). Deferred iOS cleanups: `walkDirectory` swallows root-listing errors; `downloadFile`'s `progress:` param is never invoked; the Swift FAT decode lacks the Kotlin range validation; the CSV parse tests are vacuous (`parseCSV` private — needs `@testable`/internal); `SyncIndex` should move from `Documents/` to Application Support; the import footer needs the mock-vs-real indicator + git hash.
 
 ## Development Tips
 
