@@ -46,6 +46,10 @@ class ImportViewModel: ObservableObject {
         importItems = []
         importResult = nil
 
+        // Capture once so the join and the teardown agree on the same network.
+        let ssid = settings.ssid
+        let needsWiFi = !settings.isLocalMockHost
+
         do {
             // Step 1: Check Photos permission
             let hasPermission = await photoSaver.requestPermission()
@@ -53,17 +57,13 @@ class ImportViewModel: ObservableObject {
                 throw FlashAirError.permissionDenied
             }
 
-            // Step 2: Connect to FlashAir Wi-Fi (if needed)
-            await Logger.shared.logInfo("Connecting to \(settings.ssid)...")
-
-            // Skip the Wi-Fi join when talking to a local mock server;
-            // otherwise join the FlashAir's network. (Item 5 will move this
-            // into SyncEngine with proper teardown — the predicate lives on
-            // SyncSettings so it can be reused there.)
-            if settings.isLocalMockHost {
-                await Logger.shared.logWarning("Skipping Wi-Fi connection (using mock server)")
+            // Step 2: Join the FlashAir's Wi-Fi (skipped for the local mock server,
+            // which the Simulator reaches over the shared host network stack).
+            if needsWiFi {
+                await Logger.shared.logInfo("Connecting to \(ssid)...")
+                try await wifiJoiner.joinNetwork(ssid: ssid, passphrase: settings.passphrase)
             } else {
-                try await wifiJoiner.joinNetwork(ssid: settings.ssid, passphrase: settings.passphrase)
+                await Logger.shared.logWarning("Skipping Wi-Fi connection (using mock server)")
             }
 
             // Step 3: Create sync engine and start sync
@@ -85,6 +85,15 @@ class ImportViewModel: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
             await Logger.shared.logError("Sync failed: \(error.localizedDescription)")
+        }
+
+        // Step 5: Always tear down a Wi-Fi join we created — on success OR failure —
+        // so the phone leaves the internet-less FlashAir network and regains normal
+        // connectivity. removeConfiguration is a harmless no-op if the join never
+        // actually succeeded.
+        if needsWiFi {
+            wifiJoiner.disconnect(ssid: ssid)
+            await Logger.shared.logInfo("Disconnected from \(ssid)")
         }
 
         isImporting = false
