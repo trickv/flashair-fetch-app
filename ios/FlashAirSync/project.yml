@@ -24,14 +24,14 @@ name: FlashAirSync
 
 options:
   deploymentTarget:
-    iOS: "15.0"
+    iOS: "16.0"
   createIntermediateGroups: true
   generateEmptyDirectories: true
 
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
     # Set DEVELOPMENT_TEAM in Xcode's Signing & Capabilities tab —
     # don't commit your team ID here.
 
@@ -46,6 +46,30 @@ targets:
           - "FlashAirSync.entitlements"
     info:
       path: FlashAirSync/Info.plist
+      # Source of truth for Info.plist. XcodeGen regenerates the file from
+      # these keys on every `xcodegen generate` — DO NOT hand-edit the plist,
+      # it will be clobbered. CFBundle* keys are supplied by XcodeGen defaults.
+      properties:
+        CFBundleDisplayName: FlashAir Sync
+        LSRequiresIPhoneOS: true
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+        UIApplicationSupportsIndirectInputEvents: true
+        UILaunchScreen: {}
+        UIRequiredDeviceCapabilities:
+          - arm64
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        "UISupportedInterfaceOrientations~ipad":
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSPhotoLibraryAddUsageDescription: FlashAir Sync needs access to save photos and videos imported from your FlashAir SD card.
+        NSPhotoLibraryUsageDescription: FlashAir Sync needs access to save photos and videos imported from your FlashAir SD card.
+        NSLocalNetworkUsageDescription: FlashAir Sync needs to connect to your FlashAir SD card over local Wi-Fi.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.flashairsync

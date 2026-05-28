@@ -15,13 +15,19 @@
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
-	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>FlashAir Sync needs to connect to your FlashAir SD card over local Wi-Fi.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>FlashAir Sync needs access to save photos and videos imported from your FlashAir SD card.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>FlashAir Sync needs access to save photos and videos imported from your FlashAir SD card.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -48,11 +54,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>FlashAir Sync needs access to save photos and videos imported from your FlashAir SD card.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>FlashAir Sync needs access to save photos and videos imported from your FlashAir SD card.</string>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>FlashAir Sync needs to connect to your FlashAir SD card over local Wi-Fi.</string>
 </dict>
 </plist>
