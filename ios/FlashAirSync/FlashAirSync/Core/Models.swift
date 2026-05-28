@@ -76,14 +76,34 @@ struct SyncSettings: Codable {
     var concurrentDownloads: Int
     var maxFileSizeMB: Int
 
+    #if DEBUG
+    // Debug builds default to the local Python mock server
+    // (tools/mock-flashair). The iOS Simulator shares the host's network
+    // stack, so localhost:8080 is reachable without joining any Wi-Fi.
+    // Mirrors Android's debug build variant (flashair-mock / 10.0.2.2:8080).
+    static let defaultSSID = "flashair-mock"
+    static let defaultHost = "http://localhost:8080"
+    #else
+    static let defaultSSID = "flashair"
+    static let defaultHost = "http://192.168.0.1"
+    #endif
+
     static let `default` = SyncSettings(
-        ssid: "flashair",
+        ssid: defaultSSID,
         passphrase: "12345678",
-        host: "http://192.168.0.1",
+        host: defaultHost,
         fileExtensions: ["jpg", "jpeg", "png", "heic", "mp4", "mov"],
         concurrentDownloads: 1,
         maxFileSizeMB: 2000
     )
+
+    /// True when `host` points at a local mock server. The iOS Simulator
+    /// shares the host's network stack, so the Python mock at localhost:8080
+    /// is reachable directly — no FlashAir Wi-Fi join needed. Mirrors the
+    /// Android SyncEngine predicate (minus 10.0.2.2, the Android-emulator alias).
+    var isLocalMockHost: Bool {
+        host.contains("localhost") || host.contains("127.0.0.1")
+    }
 
     func shouldImport(_ entry: DirectoryEntry) -> Bool {
         // Skip directories

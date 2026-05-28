@@ -56,11 +56,14 @@ class ImportViewModel: ObservableObject {
             // Step 2: Connect to FlashAir Wi-Fi (if needed)
             await Logger.shared.logInfo("Connecting to \(settings.ssid)...")
 
-            // For mock server testing, skip Wi-Fi connection
-            if !settings.host.contains("localhost") && !settings.host.contains("192.168.1") {
-                try await wifiJoiner.joinNetwork(ssid: settings.ssid, passphrase: settings.passphrase)
-            } else {
+            // Skip the Wi-Fi join when talking to a local mock server;
+            // otherwise join the FlashAir's network. (Item 5 will move this
+            // into SyncEngine with proper teardown — the predicate lives on
+            // SyncSettings so it can be reused there.)
+            if settings.isLocalMockHost {
                 await Logger.shared.logWarning("Skipping Wi-Fi connection (using mock server)")
+            } else {
+                try await wifiJoiner.joinNetwork(ssid: settings.ssid, passphrase: settings.passphrase)
             }
 
             // Step 3: Create sync engine and start sync
