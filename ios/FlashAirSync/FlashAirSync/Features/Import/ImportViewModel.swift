@@ -11,6 +11,9 @@ class ImportViewModel: ObservableObject {
     @Published var importResult: ImportResult?
     @Published var errorMessage: String?
     @Published var showingResult = false
+    /// Free-text "what's happening right now" line. Drives the header when set;
+    /// when nil, statusText falls back to the per-file "Importing X of N…" count.
+    @Published var currentPhase: String?
 
     // Dependencies
     private let wifiJoiner = WiFiJoiner()
@@ -24,9 +27,13 @@ class ImportViewModel: ObservableObject {
     // MARK: - Computed Properties
 
     var statusText: String {
+        if let phase = currentPhase, !phase.isEmpty {
+            return phase
+        }
         if isImporting {
+            guard !importItems.isEmpty else { return "Working…" }
             let completed = importItems.filter { $0.state.isComplete }.count
-            return "Importing \(completed) of \(importItems.count)..."
+            return "Importing \(completed) of \(importItems.count)…"
         }
         return "Ready to sync"
     }
@@ -41,6 +48,9 @@ class ImportViewModel: ObservableObject {
 
     /// Start the import process
     func startImport() async {
+        // Set phase BEFORE isImporting so the header has something meaningful
+        // the moment the progress UI appears (was showing "Importing 0 of 0...").
+        currentPhase = "Preparing..."
         isImporting = true
         errorMessage = nil
         importItems = []
@@ -49,19 +59,26 @@ class ImportViewModel: ObservableObject {
         // Capture once so the join and the teardown agree on the same network.
         let ssid = settings.ssid
         let needsWiFi = !settings.isLocalMockHost
+        print("🚀 startImport: host=\(settings.host) ssid=\(ssid) needsWiFi=\(needsWiFi)")
 
         do {
             // Step 1: Check Photos permission
+            currentPhase = "Checking Photos permission..."
             let hasPermission = await photoSaver.requestPermission()
             guard hasPermission else {
                 throw FlashAirError.permissionDenied
             }
+            print("✅ Photos permission OK")
 
             // Step 2: Join the FlashAir's Wi-Fi (skipped for the local mock server,
             // which the Simulator reaches over the shared host network stack).
             if needsWiFi {
+                currentPhase = "Joining Wi-Fi network \"\(ssid)\"..."
                 await Logger.shared.logInfo("Connecting to \(ssid)...")
+                print("📶 Joining Wi-Fi \"\(ssid)\" via NEHotspotConfiguration...")
                 try await wifiJoiner.joinNetwork(ssid: ssid, passphrase: settings.passphrase)
+                print("📶 Joined \"\(ssid)\"")
+                await Logger.shared.logInfo("Joined \(ssid)")
             } else {
                 await Logger.shared.logWarning("Skipping Wi-Fi connection (using mock server)")
             }
@@ -72,9 +89,10 @@ class ImportViewModel: ObservableObject {
 
             await Logger.shared.logInfo("Starting sync...")
 
-            let result = try await engine.sync { [weak self] items in
-                self?.importItems = items
-            }
+            let result = try await engine.sync(
+                progressCallback: { [weak self] items in self?.importItems = items },
+                phaseCallback: { [weak self] phase in self?.currentPhase = phase }
+            )
 
             // Step 4: Show result
             self.importResult = result
@@ -84,6 +102,7 @@ class ImportViewModel: ObservableObject {
 
         } catch {
             errorMessage = error.localizedDescription
+            print("❌ Sync threw: \(error)")
             await Logger.shared.logError("Sync failed: \(error.localizedDescription)")
         }
 
@@ -92,11 +111,15 @@ class ImportViewModel: ObservableObject {
         // connectivity. removeConfiguration is a harmless no-op if the join never
         // actually succeeded.
         if needsWiFi {
+            currentPhase = "Disconnecting from \"\(ssid)\"..."
+            print("📶 Removing hotspot configuration for \"\(ssid)\"...")
             wifiJoiner.disconnect(ssid: ssid)
             await Logger.shared.logInfo("Disconnected from \(ssid)")
         }
 
+        currentPhase = nil
         isImporting = false
+        print("🏁 startImport: done")
     }
 
     /// Cancel the current import

@@ -21,25 +21,30 @@ actor SyncEngine {
     /// - Parameters:
     ///   - progressCallback: Called for each state change
     /// - Returns: Array of import items with final states
-    func sync(progressCallback: @MainActor @escaping ([ImportItem]) -> Void) async throws -> ImportResult {
+    func sync(
+        progressCallback: @MainActor @escaping ([ImportItem]) -> Void,
+        phaseCallback: @MainActor @escaping (String?) -> Void
+    ) async throws -> ImportResult {
         isCancelled = false
         let startTime = Date()
 
         // Step 1: Scan DCIM directory recursively
-        print("📡 Scanning /DCIM...")
+        await phaseCallback("Scanning files on the card…")
+        print("📡 Scanning /DCIM…")
         let allEntries = try await client.walkDirectory("/DCIM") { [settings] entry in
             settings.shouldImport(entry)
         }
-
-        print("📊 Found \(allEntries.count) files on card")
+        print("📊 Found \(allEntries.count) files on card after extension/size filter")
 
         // Step 2: Filter out already-synced files
+        await phaseCallback("Checking sync history (\(allEntries.count) on card)…")
         var newEntries: [DirectoryEntry] = []
         for entry in allEntries {
             if await !index.hasSeen(entry) {
                 newEntries.append(entry)
             }
         }
+        print("🔁 \(allEntries.count - newEntries.count) already synced, \(newEntries.count) new")
 
         // Optional per-sync cap (nil = unlimited). Useful for trying the app
         // on a card with thousands of photos without committing to syncing all.
@@ -52,8 +57,11 @@ actor SyncEngine {
 
         // Step 3: Create import items
         var items = newEntries.map { ImportItem(entry: $0, state: .pending) }
-
         await progressCallback(items)
+
+        // Hand the header off to the per-file count ("Importing X of N…")
+        // that statusText computes from items during the download loop.
+        await phaseCallback(newEntries.isEmpty ? "Nothing new to import" : nil)
 
         // Step 4: Download and import each file
         var totalBytes = 0

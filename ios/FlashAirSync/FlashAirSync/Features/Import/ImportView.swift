@@ -89,9 +89,11 @@ struct ImportView: View {
 
     private var progressSection: some View {
         VStack(spacing: 16) {
-            // Progress bar
+            // Progress bar — label tracks the live phase from the view model
+            // (e.g. "Joining Wi-Fi network 'flashair'…", "Scanning files on the
+            // card…") so you can see exactly where in the pipeline we are.
             ProgressView(value: viewModel.progress) {
-                Text("Importing files...")
+                Text(viewModel.statusText)
                     .font(.headline)
             } currentValueLabel: {
                 Text("\(Int(viewModel.progress * 100))%")

@@ -52,12 +52,18 @@ actor FlashAirClient {
     func walkDirectory(_ rootPath: String, filter: ((DirectoryEntry) -> Bool)? = nil) async throws -> [DirectoryEntry] {
         var allFiles: [DirectoryEntry] = []
         var directoriesToVisit = [rootPath]
+        // Failures at the root mean we can't reach the card at all — surface
+        // them. Failures one level deeper are tolerated per the FlashAir
+        // protocol gotcha (transient hiccups on deep walks).
+        var isRootListing = true
 
         while !directoriesToVisit.isEmpty {
             let currentDir = directoriesToVisit.removeFirst()
 
             do {
+                print("📂 Listing \(currentDir)…")
                 let entries = try await listDirectory(currentDir)
+                print("   → \(entries.count) entries returned")
 
                 for entry in entries {
                     // Skip hidden files (start with .)
@@ -77,9 +83,17 @@ actor FlashAirClient {
                     }
                 }
             } catch {
-                // Log error but continue with other directories
-                print("⚠️ Failed to list directory \(currentDir): \(error)")
+                if isRootListing {
+                    // Don't swallow root-listing errors: previously this returned
+                    // [] silently and the UI reported a misleading "Imported 0
+                    // files" success when the real cause was a network failure
+                    // (VPN, unreachable card, ATS, timeout, …).
+                    print("❌ Root listing of \(currentDir) failed: \(error)")
+                    throw error
+                }
+                print("⚠️ Failed to list subdirectory \(currentDir): \(error) — continuing")
             }
+            isRootListing = false
         }
 
         return allFiles
