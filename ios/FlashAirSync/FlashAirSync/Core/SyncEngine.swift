@@ -31,10 +31,12 @@ actor SyncEngine {
         // Step 1: Scan DCIM directory recursively
         await phaseCallback("Scanning files on the card…")
         print("📡 Scanning /DCIM…")
+        await Logger.shared.logInfo("Scanning /DCIM")
         let allEntries = try await client.walkDirectory("/DCIM") { [settings] entry in
             settings.shouldImport(entry)
         }
         print("📊 Found \(allEntries.count) files on card after extension/size filter")
+        await Logger.shared.logInfo("Found \(allEntries.count) files after extension/size filter")
 
         // Step 2: Filter out already-synced files
         await phaseCallback("Checking sync history (\(allEntries.count) on card)…")
@@ -45,6 +47,7 @@ actor SyncEngine {
             }
         }
         print("🔁 \(allEntries.count - newEntries.count) already synced, \(newEntries.count) new")
+        await Logger.shared.logInfo("\(allEntries.count - newEntries.count) already synced, \(newEntries.count) new")
 
         // Optional per-sync cap (nil = unlimited). Useful for trying the app
         // on a card with thousands of photos without committing to syncing all.

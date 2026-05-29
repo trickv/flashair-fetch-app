@@ -62,8 +62,10 @@ actor FlashAirClient {
 
             do {
                 print("📂 Listing \(currentDir)…")
+                await Logger.shared.logInfo("Listing \(currentDir)")
                 let entries = try await listDirectory(currentDir)
                 print("   → \(entries.count) entries returned")
+                await Logger.shared.logInfo("→ \(entries.count) entries from \(currentDir)")
 
                 for entry in entries {
                     // Skip hidden files (start with .)
@@ -89,9 +91,11 @@ actor FlashAirClient {
                     // files" success when the real cause was a network failure
                     // (VPN, unreachable card, ATS, timeout, …).
                     print("❌ Root listing of \(currentDir) failed: \(error)")
+                    await Logger.shared.logError("Root listing of \(currentDir) failed: \(error)")
                     throw error
                 }
                 print("⚠️ Failed to list subdirectory \(currentDir): \(error) — continuing")
+                await Logger.shared.logWarning("Failed to list subdirectory \(currentDir): \(error)")
             }
             isRootListing = false
         }
