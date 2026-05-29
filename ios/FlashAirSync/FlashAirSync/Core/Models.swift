@@ -75,6 +75,9 @@ struct SyncSettings: Codable {
     var fileExtensions: [String]
     var concurrentDownloads: Int
     var maxFileSizeMB: Int
+    /// Per-sync upload cap. `nil` = no cap (sync every new file). Optional + default
+    /// so missing key in previously-stored UserDefaults JSON decodes cleanly as nil.
+    var maxFilesPerSync: Int? = nil
 
     #if DEBUG
     // Debug builds default to the local Python mock server

@@ -45,10 +45,14 @@ struct SettingsView: View {
                     Stepper("Concurrent Downloads: \(settings.concurrentDownloads)", value: $settings.concurrentDownloads, in: 1...3)
 
                     Stepper("Max File Size: \(settings.maxFileSizeMB) MB", value: $settings.maxFileSizeMB, in: 10...5000, step: 50)
+
+                    Stepper(value: maxFilesPerSyncBinding, in: 0...100) {
+                        Text("Files per sync: \(settings.maxFilesPerSync.map(String.init) ?? "All")")
+                    }
                 } header: {
                     Text("Performance")
                 } footer: {
-                    Text("Higher concurrency may be faster but uses more battery")
+                    Text("Higher concurrency may be faster but uses more battery. \"Files per sync\" caps how many new files each Sync transfers; \"All\" syncs every new file.")
                 }
 
                 // Advanced actions
@@ -120,6 +124,15 @@ struct SettingsView: View {
     // MARK: - Helpers
 
     private let availableExtensions = ["jpg", "jpeg", "png", "heic", "mp4", "mov"]
+
+    /// Bridge the Optional Int storage (nil = unlimited) to a Stepper-friendly
+    /// non-Optional Int where 0 displays as "All".
+    private var maxFilesPerSyncBinding: Binding<Int> {
+        Binding(
+            get: { settings.maxFilesPerSync ?? 0 },
+            set: { settings.maxFilesPerSync = $0 == 0 ? nil : $0 }
+        )
+    }
 
     private func binding(for extension: String) -> Binding<Bool> {
         Binding(

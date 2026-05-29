@@ -41,6 +41,13 @@ actor SyncEngine {
             }
         }
 
+        // Optional per-sync cap (nil = unlimited). Useful for trying the app
+        // on a card with thousands of photos without committing to syncing all.
+        if let limit = settings.maxFilesPerSync, limit > 0, newEntries.count > limit {
+            print("📋 Capping this sync to \(limit) of \(newEntries.count) new files (maxFilesPerSync setting)")
+            newEntries = Array(newEntries.prefix(limit))
+        }
+
         print("✨ \(newEntries.count) new files to import")
 
         // Step 3: Create import items
