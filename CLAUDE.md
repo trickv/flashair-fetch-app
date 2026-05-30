@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a vibe-coded, partially-tested cross-platform app for pulling photos/videos off Toshiba FlashAir SD cards. **M1 verified. M2 (full sync: recursive walk → download → save-to-library → `path#size` dedupe → persisted index, plus debug/release variants) is drafted on both platforms but only ever validated against the Python mock server in `tools/mock-flashair/` — never against real hardware.** M3 (resilience) and M4 (polish/WebDAV) are not started.
 
 Per-platform reality:
-- **iOS** — first built and run on 2026-05-27 (Xcode 26.5, iOS 16 deployment target). The **full M2 sync path is validated end-to-end against the mock** in the Simulator (Debug build, mock-server mode): recursive `/DCIM` walk, download, save to Photos, dedupe, persisted `SyncIndex`, and a clean incremental re-sync (5 → 2 → 0 new files across three runs). The programmatic Wi-Fi join (`WiFiJoiner` / NEHotspotConfiguration) has **never** run against a real network and needs a paid Apple Developer account for the Hotspot entitlement on-device. Real-hardware validation is the next step.
+- **iOS** — first built/run on 2026-05-27 (Xcode 26.5, iOS 16 deployment target); **validated against a real Toshiba FlashAir card on 2026-05-29**. The full M2 sync path works on both mock *and* real hardware: `NEHotspotConfiguration` join (Hotspot entitlement provisions under a paid Apple Developer team), `/DCIM` walk (Toshiba uses `100__TSB` for the camera subdir, not `100CANON`), cleartext HTTP downloads, save to Photos, `path#size` dedupe, post-sync Wi-Fi teardown. Three back-to-back real-card syncs with `maxFilesPerSync=2` produced three non-overlapping pairs (`IMG_8023`/`8024` → `8025`/`8026` → `8027`/`8028`) — dedupe demonstrably correct on hardware, not just mock. Tailscale split-route did **not** divert private-IP traffic into the tunnel. Next iOS work is the deferred-cleanups list below.
 - **Android** — the full M2 stack (`WiFiConnector`, `MediaStoreWriter`, `SyncEngine`, progress UI, retry, debug/release variants) is merged on `main` and the Android build + unit tests pass on CI, but only the **M1 directory-listing path** has actually been run against the mock server on an emulator.
 
 **Known regression on `main` as of 2026-05-18:** the mock-server CI job `Test config endpoint` (`op=104`) fails after M2's edits to `tools/mock-flashair/server.py`. Android build/test are unaffected. See `DEVELOPMENT.md` for the "Next Steps" punch list.
@@ -17,7 +17,7 @@ See `README.md` and `DEVELOPMENT.md` for the running roadmap; `SESSION-2025-01-1
 ## Repository Layout
 
 - `android/` — Kotlin + Jetpack Compose app. Real code lives under `app/src/main/java/com/flashairsync/`.
-- `ios/FlashAirSync/` — Swift + SwiftUI app. Mock-validated in the Simulator; real-hardware Wi-Fi join still untested.
+- `ios/FlashAirSync/` — Swift + SwiftUI app. Validated against mock + real FlashAir hardware (2026-05-29).
 - `tools/mock-flashair/server.py` — Flask server that mimics the FlashAir HTTP API.
 - `shared-spec/` — Protocol docs: `API.md`, `CSV-FORMAT.md`, `DEDUPE-STRATEGY.md`.
 - `.github/workflows/ci.yml` — CI: Android build+test, mock-server smoke test, lint (lint is `continue-on-error`).
@@ -79,7 +79,7 @@ The design assumes **shared core logic mirrored between iOS and Android, with on
 - `SyncIndex` — persistent dedupe state. Key is **`path#size`**, deliberately not timestamp (FAT has 2s granularity) and not filename alone. See `shared-spec/DEDUPE-STRATEGY.md` for the rationale.
 
 ### Platform glue
-- iOS: `WiFiJoiner` (NEHotspotConfiguration) — join + teardown wired in `ImportViewModel.startImport` (disconnect on success or failure), but **never run against a real network**. `PhotoSaver` (PHPhotoLibrary) — validated against the mock in the Simulator.
+- iOS: `WiFiJoiner` (NEHotspotConfiguration) — join + teardown wired in `ImportViewModel.startImport` (disconnect on success or failure); validated against a real FlashAir on 2026-05-29 (entitlement provisions under a paid team). `PhotoSaver` (PHPhotoLibrary) — validated against the mock + real hardware. Imports land in the main Photos Library *sorted by FAT capture date*, not into a dedicated "FlashAir" album — that's the iOS analog of Android's `Pictures/FlashAirImport/` and is a deferred discoverability cleanup.
 - Android:
   - `WiFiConnector` — `WifiNetworkSpecifier` + per-network binding, permission flow for `NEARBY_WIFI_DEVICES` (API 33+) / `ACCESS_FINE_LOCATION` (29–32). Drafted, never run against a real network.
   - `MediaStoreWriter` — writes to `Pictures/FlashAirImport/` via `MediaStore`.
@@ -104,7 +104,7 @@ Mirrors the Android variants, but via `#if DEBUG` in `SyncSettings.default` (`Co
 
 ## Where to Pick Up
 
-- **iOS** — mock path is validated; next is **real-FlashAir hardware** validation (the `WiFiJoiner` join/teardown path, on a device with a paid Apple Developer account), then mirror Android's M3 work. Deferred iOS cleanups noted during the 2026-05-27 session: `FlashAirClient.walkDirectory` swallows root-listing errors silently; `downloadFile`'s `progress:` param is declared but never invoked; the Swift FAT decode lacks the range validation the Kotlin side has; the CSV parse tests are vacuous (`parseCSV` is private — needs `@testable`/internal); `SyncIndex` persists to `Documents/` (user-visible in Files.app) and should move to Application Support; the import footer lacks the mock-vs-real mode indicator + git hash the Android UI shows.
+- **iOS** — mock *and* real-hardware paths both validated. Next is **M3** work (resilience: retry-with-backoff on transient timeouts like the card-powered-down case, cancellation, durable `SyncIndex` across app restarts). Deferred cleanups across the 2026-05-27..29 sessions: imports save to the general Photos Library, not a dedicated "FlashAir" album (Android writes to `Pictures/FlashAirImport/` — iOS parity needed for discoverability); `downloadFile`'s `progress:` param is declared but never invoked; the Swift FAT decode lacks the range validation the Kotlin side has; the CSV parse tests are vacuous (`parseCSV` is private — needs `@testable`/internal); `SyncIndex` persists to `Documents/` (user-visible in Files.app) and should move to Application Support; the import footer lacks the mock-vs-real mode indicator + git hash the Android UI shows.
 - **Android** — M2 code is on disk but unproven. Cheapest next slice: **validate against the mock server in the debug variant** and **fix the `op=104` mock-server regression** so CI goes green. Then real-hardware validation, then M3 (resilience: retries with backoff, cancellation, durable `SyncIndex`).
 
 See `DEVELOPMENT.md` "Next Steps" for the punch list.

@@ -48,6 +48,10 @@ tools/mock-flashair/test-data/**/*.MP4
 # Logs
 *.log
 
+# Local screen recordings of the app (not deliverables)
+ScreenRecording_*.mp4
+ScreenRecording_*.mov
+
 # Editor
 .vscode/
 .idea/
