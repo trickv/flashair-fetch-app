@@ -35,33 +35,31 @@ actor PhotoSaver {
             throw FlashAirError.permissionDenied
         }
 
-        // Determine media type
-        let ext = fileURL.pathExtension.lowercased()
+        // Determine media type from the original filename (the temp file on
+        // disk is named with a UUID and has no useful extension by itself).
+        let ext = (originalFilename as NSString).pathExtension.lowercased()
         let isVideo = ["mp4", "mov", "m4v"].contains(ext)
+        let resourceType: PHAssetResourceType = isVideo ? .video : .photo
+
+        // Tell PhotoKit the original filename explicitly. Without this it falls
+        // back to the temp file's name (a UUID), which is what shows up in the
+        // Photos Info panel and — more importantly — what iCloud/Google Photos/
+        // Immich uploaders see when they enumerate PHAssetResources. Setting
+        // it preserves IMG_NNNN.JPG end-to-end through the library and out to
+        // any photo-sync service.
+        let resourceOptions = PHAssetResourceCreationOptions()
+        resourceOptions.originalFilename = originalFilename
 
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             PHPhotoLibrary.shared().performChanges({
-                if isVideo {
-                    // Save video
-                    let request = PHAssetCreationRequest.forAsset()
-                    request.addResource(with: .video, fileURL: fileURL, options: nil)
+                let request = PHAssetCreationRequest.forAsset()
+                request.addResource(with: resourceType, fileURL: fileURL, options: resourceOptions)
 
-                    // Set creation date if provided
-                    if let date = creationDate {
-                        request.creationDate = date
-                    }
-
-                } else {
-                    // Save photo
-                    let request = PHAssetCreationRequest.forAsset()
-                    request.addResource(with: .photo, fileURL: fileURL, options: nil)
-
-                    // Set creation date if provided
-                    if let date = creationDate {
-                        request.creationDate = date
-                    }
+                // Use the FAT-decoded capture timestamp so the asset slots into
+                // the library at when the photo was actually taken.
+                if let date = creationDate {
+                    request.creationDate = date
                 }
-
             }, completionHandler: { success, error in
                 if success {
                     continuation.resume()
