@@ -104,7 +104,16 @@ Mirrors the Android variants, but via `#if DEBUG` in `SyncSettings.default` (`Co
 
 ## Where to Pick Up
 
-- **iOS** — mock *and* real-hardware paths both validated. Next is **M3** work (resilience: retry-with-backoff on transient timeouts like the card-powered-down case, cancellation, durable `SyncIndex` across app restarts). Deferred cleanups across the 2026-05-27..29 sessions: imports save to the general Photos Library, not a dedicated "FlashAir" album (Android writes to `Pictures/FlashAirImport/` — iOS parity needed for discoverability); `downloadFile`'s `progress:` param is declared but never invoked; the Swift FAT decode lacks the range validation the Kotlin side has; the CSV parse tests are vacuous (`parseCSV` is private — needs `@testable`/internal); `SyncIndex` persists to `Documents/` (user-visible in Files.app) and should move to Application Support; the import footer lacks the mock-vs-real mode indicator + git hash the Android UI shows.
+- **iOS** — mock *and* real-hardware paths both validated. Next is **M3** work (resilience: retry-with-backoff on transient timeouts like the card-powered-down case, cancellation, durable `SyncIndex` across app restarts). Deferred cleanups across the 2026-05-27..31 sessions:
+  - **Backgrounding kills long syncs.** If the user leaves the app (or it gets memory-pressure killed) mid-sync, the `URLSession` downloads stall and the `NEHotspotConfiguration` Wi-Fi link can drop. Real-hardware syncs of large cards take 30+ minutes, so backgrounding becomes a real risk. Likely fix is a combination of: (1) switch downloads to `URLSessionConfiguration.background(withIdentifier:)` so the system can resume them across suspensions, (2) set `UIRequiresPersistentWiFi` in Info.plist to keep the radio active in foreground and signal Wi-Fi-dependence to iOS power management, (3) at minimum a coachmark warning the user to keep the app open. iOS analog of Android's planned `ImportService` foreground-service.
+  - **iOS Connection Assistant prompt** mid-sync ("flashair has no internet, switch?") — needs evaluation of whether `UIRequiresPersistentWiFi` suppresses it; if not, an in-app coachmark is the floor.
+  - **Auto-scroll the import list to the active item.** For runs of 100+ files the `ScrollView` doesn't follow the live download — the currently-downloading row scrolls off-screen as completed rows accumulate. `ScrollViewReader` + reverse list order is the planned fix.
+  - **Dedicated "FlashAir" album.** Imports save to the general Photos Library, not into an album (Android writes to `Pictures/FlashAirImport/`). Discoverability suffers — users see "Saved from FlashAir Sync" attribution but no grouping.
+  - `downloadFile`'s `progress:` param is declared but never invoked.
+  - The Swift FAT decode lacks the range validation the Kotlin side has.
+  - The CSV parse tests are vacuous (`parseCSV` is private — needs `@testable`/internal).
+  - `SyncIndex` persists to `Documents/` (user-visible in Files.app) and should move to Application Support.
+  - The import footer lacks the mock-vs-real mode indicator + git hash the Android UI shows.
 - **Android** — M2 code is on disk but unproven. Cheapest next slice: **validate against the mock server in the debug variant** and **fix the `op=104` mock-server regression** so CI goes green. Then real-hardware validation, then M3 (resilience: retries with backoff, cancellation, durable `SyncIndex`).
 
 See `DEVELOPMENT.md` "Next Steps" for the punch list.

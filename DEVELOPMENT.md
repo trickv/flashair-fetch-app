@@ -208,7 +208,16 @@ The Android M2 code is merged but unexercised. The natural progression:
 
 4. **M3 work** — retries with backoff, cancellation, durable `SyncIndex` persistence across app restarts.
 
-5. **iOS** — mock + real-hardware paths both validated (2026-05-27 / 2026-05-29). Next: **M3** (resilience: retry-with-backoff on transient timeouts like the card-powered-down case, cancellation, durable index across app restarts). Deferred cleanups: imports save to the general Photos Library, not a dedicated "FlashAir" album (Android equivalent: `Pictures/FlashAirImport/`); `downloadFile`'s `progress:` param is never invoked; the Swift FAT decode lacks the Kotlin range validation; the CSV parse tests are vacuous (`parseCSV` private — needs `@testable`/internal); `SyncIndex` should move from `Documents/` to Application Support; the import footer needs the mock-vs-real indicator + git hash.
+5. **iOS** — mock + real-hardware paths both validated (2026-05-27 / 2026-05-29). Next: **M3** (resilience: retry-with-backoff on transient timeouts like the card-powered-down case, cancellation, durable index across app restarts). Deferred cleanups:
+   - **Backgrounding kills long syncs.** If the app loses foreground mid-sync (user switches apps, screen lock, memory pressure), `URLSession` downloads stall and the `NEHotspotConfiguration` Wi-Fi link can drop. Real-hardware syncs of large cards take 30+ minutes, so this matters. Likely fix: switch to `URLSessionConfiguration.background(withIdentifier:)` so the system resumes downloads across suspensions, set `UIRequiresPersistentWiFi` in Info.plist, plus a coachmark. iOS analog of Android's planned `ImportService` foreground-service.
+   - **iOS Connection Assistant prompt** ("flashair has no internet, switch?") interrupts long syncs — evaluate `UIRequiresPersistentWiFi`, otherwise coachmark.
+   - **Auto-scroll the import list to the active item** — `ScrollViewReader` + reverse list order. Currently for 100+ file runs the active row scrolls off-screen.
+   - **Dedicated "FlashAir" album.** Imports go into the general Photos Library, not an album (Android: `Pictures/FlashAirImport/`).
+   - `downloadFile`'s `progress:` param is never invoked.
+   - The Swift FAT decode lacks the Kotlin range validation.
+   - The CSV parse tests are vacuous (`parseCSV` private — needs `@testable`/internal).
+   - `SyncIndex` should move from `Documents/` to Application Support.
+   - The import footer needs the mock-vs-real indicator + git hash.
 
 ## Development Tips
 
