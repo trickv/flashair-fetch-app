@@ -21,11 +21,12 @@
 **Known Regressions on `main`:**
 - ❌ Mock-server CI step `Test config endpoint` (`op=104`) fails after M2's `tools/mock-flashair/server.py` changes. Android build/test still pass.
 
-**iOS — full sync validated against mock (2026-05-27) AND real Toshiba FlashAir hardware (2026-05-29):**
+**iOS — full sync validated against mock (2026-05-27), real Toshiba FlashAir hardware (2026-05-29), AND full-card stress test (2026-05-31):**
 - ✅ First built & run on Xcode 26.5 (iOS 16 deployment target)
 - ✅ Full M2 sync path end-to-end against the mock in the Simulator: recursive `/DCIM` walk → download → save to Photos → `path#size` dedupe → persisted `SyncIndex`, with a clean incremental re-sync (5 → 2 → 0 new files across three runs)
 - ✅ `#if DEBUG` mock-server mode (`flashair-mock` / `localhost:8080`), `NSAllowsLocalNetworking` ATS exception, `WiFiJoiner` join+teardown wired into `ImportViewModel`
-- ✅ **Real-hardware**: signed under a paid Apple Developer team, `NEHotspotConfiguration` joins and tears down cleanly, Toshiba camera subdir (`100__TSB`) walks fine, six unique photos (`IMG_8023`–`IMG_8028`) imported across three back-to-back `maxFilesPerSync=2` runs with three non-overlapping pairs — dedupe proven on hardware too.
+- ✅ **Real-hardware first runs** (2026-05-29): signed under a paid Apple Developer team, `NEHotspotConfiguration` joins and tears down cleanly, Toshiba camera subdir (`100__TSB`) walks fine, six unique photos (`IMG_8023`–`IMG_8028`) imported across three back-to-back `maxFilesPerSync=2` runs with three non-overlapping pairs.
+- ✅ **Full-card stress test** (2026-05-31): **170 files / 0 failures over ~10 minutes** (~3.5s/file ≈ 13.6 Mbps effective), original filename preserved via `PHAssetResourceCreationOptions.originalFilename` (Immich/iCloud/Google Photos friendly), and an immediate re-sync correctly reported "170 already synced, 0 new" — dedupe-at-scale verified. Debugged live via `xcrun devicectl device process launch --console` over USB tether (tunnel survives the Wi-Fi handoff that breaks Wi-Fi-paired debugging).
 - ⚠️ Imports land in the main Photos Library sorted by FAT capture date, not in a dedicated "FlashAir" album (deferred discoverability cleanup — see Next Steps).
 
 **Not Yet Implemented:**
@@ -213,6 +214,7 @@ The Android M2 code is merged but unexercised. The natural progression:
    - **iOS Connection Assistant prompt** ("flashair has no internet, switch?") interrupts long syncs — evaluate `UIRequiresPersistentWiFi`, otherwise coachmark.
    - **Auto-scroll the import list to the active item** — `ScrollViewReader` + reverse list order. Currently for 100+ file runs the active row scrolls off-screen.
    - **Dedicated "FlashAir" album.** Imports go into the general Photos Library, not an album (Android: `Pictures/FlashAirImport/`).
+   - **`SyncIndex` grows monotonically.** Files deleted on the card stay in the index forever (post-stress-test pull: 195 entries = 170 on-card + 25 stale). Multi-year card-rotation use case → index bloat. Fix at sync end: prune entries whose path wasn't in the current listing.
    - `downloadFile`'s `progress:` param is never invoked.
    - The Swift FAT decode lacks the Kotlin range validation.
    - The CSV parse tests are vacuous (`parseCSV` private — needs `@testable`/internal).
