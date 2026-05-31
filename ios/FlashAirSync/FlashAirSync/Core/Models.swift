@@ -160,6 +160,11 @@ struct ImportItem: Identifiable {
 struct ImportResult {
     let totalFiles: Int
     let importedCount: Int
+    /// Files on the card that were filtered out before the import loop because
+    /// they were already in the SyncIndex from a prior sync. Reported so the
+    /// completion alert can say "0 imported, 170 already in your library"
+    /// instead of just "0 imported", which reads like a failure.
+    let alreadySyncedCount: Int
     let skippedCount: Int
     let failedCount: Int
     let totalBytes: Int
@@ -174,6 +179,7 @@ struct ImportResult {
     var summary: String {
         """
         Imported: \(importedCount) files (\(ByteCountFormatter.string(fromByteCount: Int64(totalBytes), countStyle: .file)))
+        Already synced: \(alreadySyncedCount) files
         Skipped: \(skippedCount) files
         Failed: \(failedCount) files
         Duration: \(String(format: "%.1f", duration))s

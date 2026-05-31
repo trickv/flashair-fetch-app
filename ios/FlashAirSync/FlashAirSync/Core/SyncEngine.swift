@@ -46,8 +46,11 @@ actor SyncEngine {
                 newEntries.append(entry)
             }
         }
-        print("🔁 \(allEntries.count - newEntries.count) already synced, \(newEntries.count) new")
-        await Logger.shared.logInfo("\(allEntries.count - newEntries.count) already synced, \(newEntries.count) new")
+        // Captured BEFORE the per-sync cap is applied so the result reflects
+        // true dedupe state, not "everything beyond the limit looks new."
+        let alreadySyncedCount = allEntries.count - newEntries.count
+        print("🔁 \(alreadySyncedCount) already synced, \(newEntries.count) new")
+        await Logger.shared.logInfo("\(alreadySyncedCount) already synced, \(newEntries.count) new")
 
         // Optional per-sync cap (nil = unlimited). Useful for trying the app
         // on a card with thousands of photos without committing to syncing all.
@@ -135,6 +138,7 @@ actor SyncEngine {
         return ImportResult(
             totalFiles: items.count,
             importedCount: importedCount,
+            alreadySyncedCount: alreadySyncedCount,
             skippedCount: items.count - importedCount - failedCount,
             failedCount: failedCount,
             totalBytes: totalBytes,
