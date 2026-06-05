@@ -142,16 +142,17 @@ multi-file or some research · **L** ≈ substantial, may span sessions.
 
 ## iOS — Observability
 
-- [ ] **Wire up Sentry for crash + error + usage telemetry.** Once the app
-      goes wider for beta, in-process `Logger.shared` is invisible to us.
-      Sentry covers the gap with crash reports, error rates per sync,
-      breadcrumbs from existing log calls, anonymous performance metrics
-      (file counts, durations, throughput). Must be opt-in via Settings
-      (default off for privacy). Uploads buffer during the no-internet
-      FlashAir sync and flush after teardown. Plan: add Sentry SPM
-      dependency, init in `FlashAirSyncApp`, hook `Logger.shared` to
-      emit breadcrumbs, capture each `FlashAirError.*` path, emit a
-      `sync_completed` event with totals. _Effort: M._
+- [x] **Wire up Sentry for crash + error + usage telemetry.** ✅ Done
+      2026-06-03 (`022f95e`). Sentry Cocoa SDK 9.16.1 via SPM, opt-in
+      via Settings → Privacy (default off). `Utils/Telemetry.swift`
+      wrapper isolates the rest of the app from the SDK. `Logger.shared`
+      bridges to breadcrumbs; `ImportViewModel`'s catch path captures
+      `FlashAirError.*`; success path emits a `sync_completed` event with
+      aggregate-only metrics (no filenames, no photo content). Privacy
+      hardening: no Session Replay, no screenshot/view-hierarchy
+      attachments, `sendDefaultPii = false`, no profiling. DSN lives in
+      `Info.plist` via `project.yml` info.properties (public per Sentry
+      docs — safe to commit).
 
 ## iOS — Code quality / testing
 
