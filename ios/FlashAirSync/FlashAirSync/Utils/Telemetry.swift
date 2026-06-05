@@ -21,10 +21,12 @@ enum Telemetry {
 
     // MARK: - Lifecycle
 
-    /// Start Sentry iff the user has opted in. Called from app launch.
+    /// Start Sentry unless the user has explicitly opted out. Called from
+    /// app launch. `nil` (never touched the toggle) and `true` both start
+    /// the SDK; only an explicit `false` skips it.
     @MainActor
     static func startIfEnabled() {
-        guard UserDefaults.standard.syncSettings.telemetryEnabled == true else { return }
+        guard UserDefaults.standard.syncSettings.telemetryEnabled != false else { return }
         start()
     }
 

@@ -62,11 +62,11 @@ struct SettingsView: View {
                     Text("Privacy")
                 } footer: {
                     Text("""
-                    Off by default. When on, sends anonymous crash reports and \
-                    sync metrics (file counts, durations, success/failure) to help \
+                    On by default. Sends anonymous crash reports and sync \
+                    metrics (file counts, durations, success/failure) to help \
                     improve the app. No photo content, no filenames, no personal \
                     information. Takes effect immediately; full crash-report \
-                    coverage starts on next app launch.
+                    coverage starts on next app launch. Toggle off at any time.
                     """)
                 }
 
@@ -171,7 +171,7 @@ struct SettingsView: View {
     /// pending change.
     private var telemetryEnabledBinding: Binding<Bool> {
         Binding(
-            get: { settings.telemetryEnabled ?? false },
+            get: { settings.telemetryEnabled ?? true },
             set: { newValue in
                 settings.telemetryEnabled = newValue
                 // Persist immediately so Cancel doesn't undo a privacy choice.
