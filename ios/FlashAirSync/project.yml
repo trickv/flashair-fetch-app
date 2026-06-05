@@ -125,6 +125,33 @@ targets:
         SUPPORTS_MACCATALYST: false
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
+    postBuildScripts:
+      # Inject git commit hash + build timestamp into the BUILT BUNDLE's
+      # Info.plist (not the source — keeps the source tree clean so we
+      # don't get git-status noise every build). Read at runtime in
+      # SettingsView via Bundle.main.infoDictionary.
+      #
+      # Runs after Process Info.plist and before code signing, so the
+      # injected keys are included in the signature.
+      - name: Inject git commit + build date
+        runOnlyWhenInstalling: false
+        # No inputFiles / outputFiles — we want this to run on every build
+        # (git HEAD and timestamp change between builds and we can't easily
+        # encode that as a dependency).
+        script: |
+          set -e
+          INFO_PLIST="$BUILT_PRODUCTS_DIR/$INFOPLIST_PATH"
+          if [ ! -f "$INFO_PLIST" ]; then
+            echo "warning: $INFO_PLIST not found; skipping git/build injection"
+            exit 0
+          fi
+          GIT_HASH=$(git -C "$SRCROOT/../.." describe --always --dirty --abbrev=7 2>/dev/null || echo "unknown")
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          /usr/libexec/PlistBuddy -c "Add :GitCommitHash string $GIT_HASH" "$INFO_PLIST" 2>/dev/null \
+            || /usr/libexec/PlistBuddy -c "Set :GitCommitHash $GIT_HASH" "$INFO_PLIST"
+          /usr/libexec/PlistBuddy -c "Add :BuildDate string $BUILD_DATE" "$INFO_PLIST" 2>/dev/null \
+            || /usr/libexec/PlistBuddy -c "Set :BuildDate $BUILD_DATE" "$INFO_PLIST"
+          echo "Injected GitCommitHash=$GIT_HASH BuildDate=$BUILD_DATE"
 
   FlashAirSyncTests:
     type: bundle.unit-test

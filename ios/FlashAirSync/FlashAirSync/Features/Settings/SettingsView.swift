@@ -98,6 +98,21 @@ struct SettingsView: View {
                             .foregroundColor(.secondary)
                     }
 
+                    HStack {
+                        Text("Commit")
+                        Spacer()
+                        Text(gitCommitHash)
+                            .foregroundColor(.secondary)
+                            .font(.system(.body, design: .monospaced))
+                    }
+
+                    HStack {
+                        Text("Built")
+                        Spacer()
+                        Text(buildDateFormatted)
+                            .foregroundColor(.secondary)
+                    }
+
                     Link(destination: URL(string: "https://github.com/trickv/flashair-fetch-app")!) {
                         Label("View on GitHub", systemImage: "link")
                     }
@@ -202,6 +217,26 @@ struct SettingsView: View {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
         return "\(version) (\(build))"
+    }
+
+    /// Short git hash (e.g. "abc1234" or "abc1234-dirty"), injected at build
+    /// time by project.yml's postBuildScripts. Falls back to "unknown" if the
+    /// key isn't present (e.g. running in the simulator preview or a build
+    /// that ran outside the script's git context).
+    private var gitCommitHash: String {
+        Bundle.main.object(forInfoDictionaryKey: "GitCommitHash") as? String ?? "unknown"
+    }
+
+    /// Build timestamp formatted for display. The build script writes ISO 8601
+    /// UTC; we render it in the user's locale + timezone for readability.
+    private var buildDateFormatted: String {
+        let raw = Bundle.main.object(forInfoDictionaryKey: "BuildDate") as? String ?? "unknown"
+        let parser = ISO8601DateFormatter()
+        guard let date = parser.date(from: raw) else { return raw }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 }
 
