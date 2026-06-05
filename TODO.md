@@ -26,6 +26,13 @@ multi-file or some research · **L** ≈ substantial, may span sessions.
       wrap the `ScrollView` in `ScrollViewReader` + reverse the list so
       pending is at the bottom and the active row sits at the top.
       _Effort: S._
+- [ ] **Last-imported thumbnail preview.** Show a small thumbnail of the
+      most-recently-saved photo in the progress UI so the photographer
+      can glance at the phone mid-shoot and see what just came across.
+      Plan: keep the last `PHAsset`'s localIdentifier in the VM, load a
+      thumbnail via `PHImageManager.requestImage(for:targetSize:…)` at
+      a small size (e.g. 64pt), display it in a corner of `progressSection`.
+      Surfaced from real-world photo-shoot use on 2026-06-03. _Effort: M._
 - [ ] **Dedicated "FlashAir" album in Photos.** iOS analog of Android's
       `Pictures/FlashAirImport/`. Currently imports save into the main
       Photos Library at their FAT capture date — you can find them via
@@ -39,6 +46,19 @@ multi-file or some research · **L** ≈ substantial, may span sessions.
       a small build phase to plumb the git short-hash into a Swift constant
       (Android does this via `resValue` for `R.string.git_commit_id`).
       _Effort: S._
+
+## iOS — Feature: Live shooting mode
+
+- [ ] **"Live shooting mode" toggle.** After an initial sync, instead of
+      tearing down the Wi-Fi, keep it joined and poll `walkDirectory` every
+      ~2 seconds. When new files appear, sync them immediately. Toggle in
+      Settings or a button on the main screen ("Stay Connected"). Useful
+      during active photo shoots — you press the shutter, the photo lands
+      on the phone seconds later. Power-intensive (radio + repeated HTTP),
+      so should auto-exit after N minutes of no activity or on user tap.
+      Surfaced from real-world use on 2026-06-03. Concerns: depends on the
+      backgrounding fix below if the user wants to keep the phone screen-
+      locked during the shoot. _Effort: M–L._
 
 ## iOS — Index hygiene
 
@@ -81,10 +101,37 @@ multi-file or some research · **L** ≈ substantial, may span sessions.
       had powered down between shots; each required a manual re-tap of
       Sync. The first listing-level timeout should trigger an exponential
       backoff retry rather than failing the whole sync. _Effort: M._
+- [ ] **Retry on Wi-Fi-not-found with coachmark.** When the SSID isn't
+      broadcasting (camera off / sleeping), don't error out immediately —
+      sit in a retry loop with a friendly message like "Looking for
+      FlashAir… please power on your camera." Today the failure surfaces as
+      a generic red error banner. Surfaced from real-world use on
+      2026-06-03. _Effort: S–M, overlaps with retry-with-backoff above._
+- [ ] **Reduce the every-sync hotspot-join consent prompt.** iOS re-prompts
+      on every `NEHotspotConfiguration.apply()` because we explicitly
+      `removeConfiguration` during teardown. Three options to evaluate:
+      (a) drop the teardown and accept that the phone stays on the
+      no-internet network until iOS auto-switches; (b) switch
+      `joinOnce = true` and let iOS auto-remove on disconnect; (c) keep
+      current behavior. Needs hands-on testing — Apple's prompt behavior
+      varies by iOS version. _Effort: S (test) + S (implement chosen path)._
 - [ ] **Wire up the existing Cancel button.** The `Cancel` button shows
       mid-sync but `SyncEngine.cancel()` is never called from the running
       download loop. `isCancelled` checks already exist in `sync()` — just
       need the UI button to call into the actor. _Effort: S._
+
+## iOS — Observability
+
+- [ ] **Wire up Sentry for crash + error + usage telemetry.** Once the app
+      goes wider for beta, in-process `Logger.shared` is invisible to us.
+      Sentry covers the gap with crash reports, error rates per sync,
+      breadcrumbs from existing log calls, anonymous performance metrics
+      (file counts, durations, throughput). Must be opt-in via Settings
+      (default off for privacy). Uploads buffer during the no-internet
+      FlashAir sync and flush after teardown. Plan: add Sentry SPM
+      dependency, init in `FlashAirSyncApp`, hook `Logger.shared` to
+      emit breadcrumbs, capture each `FlashAirError.*` path, emit a
+      `sync_completed` event with totals. _Effort: M._
 
 ## iOS — Code quality / testing
 
