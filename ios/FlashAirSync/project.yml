@@ -28,6 +28,37 @@ options:
   createIntermediateGroups: true
   generateEmptyDirectories: true
 
+# SPM dependencies. XcodeGen resolves these via Xcode's package manager
+# on `xcodegen generate`; the lock data lives in Package.resolved inside
+# the generated .xcodeproj (which is gitignored — Sentry's version is
+# pinned via the `from:` floor below).
+packages:
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa
+    from: "9.15.0"
+
+# Explicit scheme definitions. Required since the `packages:` block above
+# was added — XcodeGen no longer auto-creates schemes for projects with
+# SPM dependencies in some versions, and an explicit declaration avoids
+# the "project contains no schemes" failure mode.
+schemes:
+  FlashAirSync:
+    build:
+      targets:
+        FlashAirSync: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - FlashAirSyncTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+
 settings:
   base:
     SWIFT_VERSION: "5.0"
@@ -44,6 +75,9 @@ targets:
         excludes:
           - "Info.plist"
           - "FlashAirSync.entitlements"
+    dependencies:
+      - package: Sentry
+        product: Sentry
     info:
       path: FlashAirSync/Info.plist
       # Source of truth for Info.plist. XcodeGen regenerates the file from
@@ -77,6 +111,11 @@ targets:
         # iOS analog of Android's network_security_config cleartext whitelist.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+        # Sentry DSN. Read at startup by Telemetry.startIfEnabled() and only
+        # used when the user opts in via Settings -> Privacy. The DSN is
+        # public per Sentry's own docs ("safe to include in source code");
+        # it identifies the destination project, not a secret credential.
+        SentryDSN: https://fcc743bcc1e56d3f3d852fa8d2ae09fc@o4510950028279809.ingest.us.sentry.io/4511510747676672
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.flashairsync

@@ -100,10 +100,23 @@ class ImportViewModel: ObservableObject {
 
             await Logger.shared.logInfo("Sync completed: \(result.importedCount) imported, \(result.failedCount) failed")
 
+            // Telemetry: structured sync_completed event with aggregate
+            // numbers only (no filenames, no photo content).
+            Telemetry.captureSyncCompleted(
+                totalFiles: result.totalFiles,
+                importedCount: result.importedCount,
+                alreadySyncedCount: result.alreadySyncedCount,
+                skippedCount: result.skippedCount,
+                failedCount: result.failedCount,
+                totalBytes: result.totalBytes,
+                duration: result.duration
+            )
+
         } catch {
             errorMessage = error.localizedDescription
             print("❌ Sync threw: \(error)")
             await Logger.shared.logError("Sync failed: \(error.localizedDescription)")
+            Telemetry.capture(error, extra: ["phase": "sync_lifecycle", "host": settings.host])
         }
 
         // Step 5: Always tear down a Wi-Fi join we created — on success OR failure —

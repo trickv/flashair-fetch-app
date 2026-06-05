@@ -33,6 +33,11 @@ actor Logger {
 
         // Also log to os_log for system integration
         os_log("%{public}@", log: .default, type: level.osLogType, message)
+
+        // Bridge to Sentry breadcrumbs (no-op when telemetry is opted out).
+        // Wired here so every log line we already emit becomes context that
+        // travels alongside any captured error.
+        Telemetry.breadcrumb(message, level: level)
     }
 
     func logInfo(_ message: String) {

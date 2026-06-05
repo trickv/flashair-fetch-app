@@ -55,6 +55,21 @@ struct SettingsView: View {
                     Text("Higher concurrency may be faster but uses more battery. \"Files per sync\" caps how many new files each Sync transfers; \"All\" syncs every new file.")
                 }
 
+                // Privacy / telemetry
+                Section {
+                    Toggle("Send Anonymous Telemetry", isOn: telemetryEnabledBinding)
+                } header: {
+                    Text("Privacy")
+                } footer: {
+                    Text("""
+                    Off by default. When on, sends anonymous crash reports and \
+                    sync metrics (file counts, durations, success/failure) to help \
+                    improve the app. No photo content, no filenames, no personal \
+                    information. Takes effect immediately; full crash-report \
+                    coverage starts on next app launch.
+                    """)
+                }
+
                 // Advanced actions
                 Section {
                     Button(role: .destructive) {
@@ -131,6 +146,29 @@ struct SettingsView: View {
         Binding(
             get: { settings.maxFilesPerSync ?? 0 },
             set: { settings.maxFilesPerSync = $0 == 0 ? nil : $0 }
+        )
+    }
+
+    /// Telemetry toggle takes effect *immediately* (persists to UserDefaults
+    /// and starts/stops Sentry on flip) — different from the rest of the
+    /// settings which only apply on Save. The "apply now" UX is appropriate
+    /// for a privacy toggle: tapping it should feel decisive, not stage a
+    /// pending change.
+    private var telemetryEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { settings.telemetryEnabled ?? false },
+            set: { newValue in
+                settings.telemetryEnabled = newValue
+                // Persist immediately so Cancel doesn't undo a privacy choice.
+                var stored = UserDefaults.standard.syncSettings
+                stored.telemetryEnabled = newValue
+                UserDefaults.standard.syncSettings = stored
+                if newValue {
+                    Telemetry.start()
+                } else {
+                    Telemetry.stop()
+                }
+            }
         )
     }
 

@@ -33,6 +33,8 @@
 	<string>FlashAir Sync needs access to save photos and videos imported from your FlashAir SD card.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>FlashAir Sync needs access to save photos and videos imported from your FlashAir SD card.</string>
+	<key>SentryDSN</key>
+	<string>https://fcc743bcc1e56d3f3d852fa8d2ae09fc@o4510950028279809.ingest.us.sentry.io/4511510747676672</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
