@@ -31,6 +31,10 @@ struct ImportView: View {
             }
             .padding()
             .navigationTitle("FlashAir Sync")
+            // Inline (small, centered in nav bar) so the title doesn't visually
+            // overlap the 80pt Wi-Fi icon in headerSection. SettingsView already
+            // does this; brings the two screens into consistent style.
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
