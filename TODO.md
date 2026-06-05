@@ -81,7 +81,27 @@ multi-file or some research · **L** ≈ substantial, may span sessions.
       mid-sync (user switches apps, screen lock, memory pressure), the
       `URLSession` downloads stall and the `NEHotspotConfiguration` Wi-Fi
       link can drop. Real-hardware syncs of a full card take 10+ minutes,
-      so this is a real risk. Likely fix is a combination of:
+      so this is a real risk. Confirmed in-the-field on 2026-06-03: user
+      wants to be able to lock the screen during long shoots, currently
+      has to keep the screen on for the entire sync.
+
+      **Before implementing — feasibility deep-dive (added 2026-06-03).**
+      The plan below is "likely fix," not validated. Do an in-depth review
+      first to confirm there's no simpler workaround we're missing:
+      - Read Apple's actual `UIRequiresPersistentWiFi` semantics under
+        screen lock (docs are vague — does it actually keep Wi-Fi alive
+        when locked, or only when active in foreground?).
+      - Test what really happens to a background `URLSession` + an active
+        `NEHotspotConfiguration` when the screen locks on the FlashAir
+        network specifically.
+      - Scan for any newer iOS 17/18/26 APIs that might apply (e.g. has
+        BackgroundTasks framework grown anything relevant?).
+      - Search for third-party reports of comparable app patterns —
+        camera importers, scientific instrument apps, IoT setup flows.
+      - Goal: either find a cheaper workaround, or confirm the multi-
+        pronged fix below is genuinely the right path.
+
+      Likely fix (post-deep-dive), a combination of:
       1. Switch downloads to `URLSessionConfiguration.background(withIdentifier:)`
          so the system can resume them across suspensions.
       2. Set `UIRequiresPersistentWiFi` in `Info.plist` (via `project.yml`
@@ -90,7 +110,7 @@ multi-file or some research · **L** ≈ substantial, may span sessions.
       3. At minimum, a coachmark warning the user to keep the app open.
 
       iOS analog of Android's planned `ImportService` foreground-service.
-      _Effort: L._
+      _Effort: L (including the feasibility deep-dive)._
 - [ ] **iOS Connection Assistant prompt mid-sync** ("flashair has no
       internet, switch?"). Surfaced during the 2026-05-31 170-file run;
       user has to tap Stay or the sync breaks. Evaluate whether
