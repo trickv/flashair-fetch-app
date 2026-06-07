@@ -1,22 +1,18 @@
 # FlashAir Sync
 
 > [!WARNING]
-> **⚠️ VIBE-CODED PROJECT - M2 DRAFTED, UNVALIDATED ⚠️**
+> **⚠️ VIBE-CODED PROJECT - iOS validated, Android pending ⚠️**
 >
-> This project was generated through AI-assisted development ("vibe coding"). M1 and a first cut of M2 have been written and merged to `main`. The codebase is **partially tested** and should be considered **experimental**.
+> This project was generated through AI-assisted development ("vibe coding"). The codebase is **partially tested** and should still be considered **experimental**.
 >
-> **Current Status (Updated 2026-05-18):**
-> - ✅ **M1:** Android app connects and lists /DCIM directory (tested against mock server)
-> - ✅ **M2 (drafted):** WiFiConnector, MediaStoreWriter, SyncEngine, progress UI, retry-on-error, debug/release build variants for mock vs. real FlashAir. Android build + unit tests pass on CI.
-> - ✅ Project scaffolding complete (Android + iOS)
-> - ✅ Unit tests passing (FAT encoding, CSV parsing)
-> - ⚠️ **M2 has not been exercised end-to-end** — only the M1 directory-listing path has been confirmed on the emulator.
-> - ⚠️ **Not tested on real FlashAir hardware**
-> - ⚠️ **iOS app scaffolded but untested (no Xcode validation yet)**
-> - ⚠️ **Mock-server CI regression:** the `op=104` config endpoint currently fails after M2's `server.py` changes; mock-server smoke test is red on `main`.
+> **Current Status (Updated 2026-06-05):**
+> - ✅ **iOS:** Full M2 sync path **validated end-to-end against real Toshiba FlashAir hardware** (2026-05-29). Full-card stress test on 2026-05-31: **170 files / 0 failures / ~9m39s** at ~10.6 Mbps. Dedupe-at-scale verified by a back-to-back re-sync ("170 already synced, 0 new"). Original filenames preserved into Photos (Immich-friendly). Opt-in Sentry telemetry default-on for the beta. See `docs/REAL-WORLD-FINDINGS.md` for detail.
+> - ⚠️ **Android:** M2 stack (`WiFiConnector`, `MediaStoreWriter`, `SyncEngine`, progress UI, retry, debug/release variants) is merged on `main` and CI is green, but only the **M1 directory-listing path** has been run on the emulator. Real-hardware validation pending. iOS validation gives high confidence the core protocol/strategy is right — the gap is platform glue only.
+> - ⚠️ **Mock-server CI regression:** the `op=104` config-endpoint test fails after M2's `server.py` edits. Android build/test still pass.
+> - ⚠️ **M3 (resilience):** not started — see `TODO.md`.
 >
-> **Use at your own risk.** Expect bugs, incomplete features, and breaking changes.
-> See `DEVELOPMENT.md` for build instructions and technical details.
+> **Use at your own risk.** Expect bugs and breaking changes.
+> See `DEVELOPMENT.md` for build instructions; `docs/PARITY.md` for the iOS↔Android mirror checklist; `TODO.md` for the active backlog.
 
 A robust, cross-platform mobile application for importing photos and videos from Toshiba FlashAir SD cards to iOS and Android devices.
 
@@ -48,20 +44,30 @@ flashair-sync/
 ### iOS App
 
 **Requirements:**
-- Xcode 14.0+
-- iOS 15.0+ deployment target
-- macOS 12.0+ (for development)
+- Xcode 26.5+ (older may work but is untested)
+- iOS 16.0+ deployment target
+- macOS 14.0+ (for development)
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`)
+- For real-device installs: a **paid Apple Developer Program account** (needed for the Hotspot Configuration entitlement to provision; personal/free Apple IDs cannot)
 
 **Build Instructions:**
+The `.xcodeproj` is generated from `project.yml` and is **not** committed — regenerate after pulling and any `project.yml` change:
+
 ```bash
 cd ios/FlashAirSync
+xcodegen generate
 open FlashAirSync.xcodeproj
+# Set Team in Signing & Capabilities (intentionally blank in project.yml)
 # Build and run on simulator or device (Cmd+R)
 ```
 
 **Permissions:**
 - Hotspot Configuration (joins FlashAir Wi-Fi)
 - Photo Library (saves imported media)
+- Local Network (reaches the card's `192.168.0.1`)
+
+See `docs/BETA-TESTING.md` for the full pre-submission checklist
+(release notes template, privacy defaults, entitlements, etc.).
 
 ### Android App
 
@@ -132,10 +138,11 @@ Customize these in the app's Settings screen.
 
 ## Development Roadmap
 
-- [x] **M1**: Project setup, connect & list `/DCIM`
-- [~] **M2**: Incremental import + media save + progress UI (Android: code merged, not yet validated end-to-end; iOS: not started)
-- [ ] **M3**: Resilience (retries, cancellation, state persistence)
-- [ ] **M4**: Polish (settings, logs export, optional WebDAV)
+- [x] **M1**: Project setup, connect & list `/DCIM` (both platforms)
+- [x] **M2** (iOS): Incremental import + media save + progress UI — **validated against real Toshiba FlashAir hardware 2026-05-29** including a 170-file stress test
+- [~] **M2** (Android): code merged on `main` and CI green, but only the M1 listing path has been exercised on the emulator — mock + real-hardware validation pending
+- [ ] **M3**: Resilience (retries with backoff, cancellation, background-safe long syncs) — see `TODO.md` and `docs/PARITY.md`
+- [ ] **M4**: Polish (logs export, optional WebDAV, etc.)
 
 ## Contributing
 

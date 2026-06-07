@@ -320,8 +320,98 @@ FlashAir Sync **does not** implement configuration updates in v1 for safety.
 - [FlashAir API Documentation](https://flashair-developers.com/en/documents/api/)
 - [LUA Tutorial (advanced)](https://flashair-developers.com/en/documents/tutorial/)
 
+## Real-World Quirks (2026-05-29 → 2026-06-05)
+
+These are operational details observed against a real Toshiba
+FlashAir card paired with a Canon EOS REBEL T5i. They aren't in the
+protocol spec — they're things the spec doesn't tell you that the
+hardware actually does.
+
+### `/DCIM` subdirectory naming varies by camera vendor
+
+The canonical example paths in this doc use `/DCIM/100CANON/…` for
+familiarity. **Real cards use whatever subdir naming the camera
+firmware chose**:
+
+- **Toshiba FlashAir** (its own DCIM partition): `/DCIM/100__TSB/`
+- Canon DSLRs (their own DCIM partition): `/DCIM/100CANON/`,
+  `/DCIM/101CANON/`, …
+- Nikon: `/DCIM/100NIKON/`
+- And so on.
+
+In addition, the Canon firmware adds sibling housekeeping dirs:
+
+```
+/DCIM/EOSMISC/    ← typically 1 entry (firmware config)
+/DCIM/MISC/       ← typically 0 entries
+```
+
+The recursive walker must be **name-agnostic** and tolerate the
+empty/non-media siblings without falling over.
+
+A listing showing "3 directories, 0 files" at `/DCIM` is correct,
+not a bug.
+
+### Real-world throughput
+
+170-file sync of a Toshiba FlashAir W-04 to an iPhone 16 (iOS 26.5)
+over the card's Wi-Fi:
+
+| Metric | Value |
+|---|---|
+| Total bytes | 768.8 MB |
+| Duration | 579.4 s |
+| Per-file average | ~3.41 s |
+| Effective throughput | ~10.6 Mbps |
+| Per-file failures | 0 |
+
+The "first 30 seconds" of any sync are dominated by Wi-Fi join +
+recursive `/DCIM` scan; per-file downloading hits ~3.4 s steady-state
+after that.
+
+### Observed timeout: 30s matches card behavior
+
+iOS's HTTP listing call to `/command.cgi?op=100&DIR=/DCIM` timed out
+at **30.5 s** when the camera was off (verified via Sentry HTTP
+breadcrumb). The 30s "directory listing timeout" recommended in the
+Implementation Guidelines section above is consistent with this. Use
+**30s as a floor** for FlashAir HTTP timeouts on both platforms.
+
+### Camera body sleep is a hard constraint
+
+The card's `APPAUTOTIME` controls how long the *card's own Wi-Fi*
+stays alive after idle. It does **not** control the camera body's
+power state. When the camera body idles and sleeps (Canon T5i
+default: 2 min), it powers down its own Wi-Fi controller and the
+card eventually drops with it.
+
+**The card exposes no API to keep the camera body awake.** User
+workaround: bump camera power-save to 15 min / never, or shutter
+half-press periodically during long syncs.
+
+### "Saved from FlashAir Sync" attribution (iOS-specific)
+
+When the iOS app saves a photo via `PHAssetCreationRequest`, the
+Photos.app Info panel shows **"Saved from FlashAir Sync"** as the
+source app — automatic from PhotoKit, no code required.
+
+### Filename + EXIF preservation
+
+`PHAssetCreationRequest.addResource(with: .photo, fileURL:)` with
+`PHAssetResourceCreationOptions.originalFilename` set preserves both
+the original filename (e.g. `IMG_8027.JPG`) and the bytes of the
+JPEG verbatim. EXIF (camera body, lens, ISO, aperture, shutter, GPS
+if present) flows through intact.
+
+This matters for downstream sync to Immich, iCloud Photo Library,
+Google Photos, etc.: Immich dedupes by **content hash** (sha1 of
+bytes), so byte-identity to a direct SD-card offload is the key
+guarantee. The filename is for human visibility, the EXIF for
+search/categorization, the bytes for dedupe.
+
 ## Changelog
 
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2025-01-15 | Initial specification for FlashAir Sync v1 |
+| 1.1 | 2026-06-05 | Added Real-World Quirks section (Toshiba `100__TSB`, throughput, 30s timeout floor, camera-sleep constraint, attribution + EXIF behavior) |

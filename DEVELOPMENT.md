@@ -26,8 +26,11 @@
 - ✅ Full M2 sync path end-to-end against the mock in the Simulator: recursive `/DCIM` walk → download → save to Photos → `path#size` dedupe → persisted `SyncIndex`, with a clean incremental re-sync (5 → 2 → 0 new files across three runs)
 - ✅ `#if DEBUG` mock-server mode (`flashair-mock` / `localhost:8080`), `NSAllowsLocalNetworking` ATS exception, `WiFiJoiner` join+teardown wired into `ImportViewModel`
 - ✅ **Real-hardware first runs** (2026-05-29): signed under a paid Apple Developer team, `NEHotspotConfiguration` joins and tears down cleanly, Toshiba camera subdir (`100__TSB`) walks fine, six unique photos (`IMG_8023`–`IMG_8028`) imported across three back-to-back `maxFilesPerSync=2` runs with three non-overlapping pairs.
-- ✅ **Full-card stress test** (2026-05-31): **170 files / 0 failures over ~10 minutes** (~3.5s/file ≈ 13.6 Mbps effective), original filename preserved via `PHAssetResourceCreationOptions.originalFilename` (Immich/iCloud/Google Photos friendly), and an immediate re-sync correctly reported "170 already synced, 0 new" — dedupe-at-scale verified. Debugged live via `xcrun devicectl device process launch --console` over USB tether (tunnel survives the Wi-Fi handoff that breaks Wi-Fi-paired debugging).
-- ⚠️ Imports land in the main Photos Library sorted by FAT capture date, not in a dedicated "FlashAir" album (deferred discoverability cleanup — see Next Steps).
+- ✅ **Full-card stress test** (2026-05-31): **170 files / 768.8 MB / 0 failures / ~9m39s** (~3.4s/file ≈ **10.6 Mbps** effective — earlier docs cited 13.6 Mbps, which used a wrong file-size average), original filename preserved via `PHAssetResourceCreationOptions.originalFilename` (Immich/iCloud/Google Photos friendly), and an immediate re-sync correctly reported "170 already synced, 0 new" — dedupe-at-scale verified. Debugged live via `xcrun devicectl device process launch --console` over USB tether (tunnel survives the Wi-Fi handoff that breaks Wi-Fi-paired debugging).
+- ✅ **Sentry telemetry** (2026-06-03 → 2026-06-05): Sentry Cocoa SDK 9.16.1 wired via `Utils/Telemetry.swift` thin wrapper. Opt-in default-on via Settings → Privacy. Privacy-hardened: no Session Replay, no screenshots, no PII, no profiling. `Logger.shared` bridges to breadcrumbs; `ImportViewModel`'s catch path captures `FlashAirError.*`; success path emits a `sync_completed` event with aggregate-only metrics. Verified end-to-end via real-hardware sync that landed an event in the Sentry dashboard.
+- ✅ **Build info in Settings → About** (2026-06-05): `postBuildScripts` injects `GitCommitHash` (with `-dirty` suffix if relevant) and `BuildDate` into the built bundle's Info.plist. No source-tree noise.
+- ✅ **Result alert shows `Already synced: N files`** (2026-06-03) — distinguishes "nothing new" from "nothing imported" (was confusing UX in the re-sync case).
+- ⚠️ Imports land in the main Photos Library sorted by FAT capture date, not in a dedicated "FlashAir" album (deferred discoverability cleanup — see `TODO.md`).
 
 **Not Yet Implemented:**
 - M3 (resilience), M4 (settings, logs export, WebDAV)
@@ -245,8 +248,17 @@ The git commit hash is automatically embedded at build time. No manual updates n
 
 ## References
 
+### In-repo docs
+- [Real-World Findings](docs/REAL-WORLD-FINDINGS.md) — what real hardware taught us
+- [iOS ↔ Android Parity](docs/PARITY.md) — what each platform has, what the other still needs
+- [Beta Testing Playbook](docs/BETA-TESTING.md) — distribution + privacy setup
+- [TODO](TODO.md) — active backlog with effort estimates
 - [FlashAir API Documentation](shared-spec/API.md)
 - [CSV Format Specification](shared-spec/CSV-FORMAT.md)
 - [Deduplication Strategy](shared-spec/DEDUPE-STRATEGY.md)
+
+### External
 - [Android Jetpack Compose](https://developer.android.com/jetpack/compose)
 - [Android Network Security Config](https://developer.android.com/training/articles/security-config)
+- [Sentry Cocoa SDK](https://docs.sentry.io/platforms/apple/) — used by iOS telemetry
+- [Sentry Android SDK](https://docs.sentry.io/platforms/android/) — pending Android telemetry wiring

@@ -431,7 +431,71 @@ def reset_index(ssid: String):
 
 **Risk:** False positives if card not fully scanned (network drop)
 
+## Real-World Validation (2026-05-29 → 2026-05-31)
+
+The `path#size` strategy was validated end-to-end on real Toshiba
+FlashAir hardware paired with a Canon EOS REBEL T5i.
+
+### Dedupe-at-scale proof
+
+**Setup:**
+- 170 photos on the card (JPGs in `/DCIM/100__TSB/`)
+- iOS app with `SyncEngine` + `SyncIndex` per this strategy
+- Fresh index (empty before run 1)
+
+**Run 1 (full sync):**
+- All 170 files imported
+- Index grew to 170 entries
+- Throughput: ~10.6 Mbps effective (768.8 MB in 579.4 s)
+
+**Run 2 (immediate re-sync, same card, no new photos):**
+- "0 imported, 170 already synced" — exactly correct
+- Duration: 3.6 s (just the listing + dedupe filter, no downloads)
+- Index unchanged at 170 entries
+
+**Earlier runs (incremental sync with `maxFilesPerSync=2` cap):**
+- Three back-to-back syncs produced three **non-overlapping pairs**:
+  `IMG_8023/8024` → `IMG_8025/8026` → `IMG_8027/8028`
+- This proves the `path#size` key is **stable across sessions** —
+  exactly what the strategy requires.
+
+### Monotonic-growth observation
+
+A `devicectl copy from` pull of the index file post-stress-test
+showed **195 entries**, of which:
+- **170 were on the card** (the current photos)
+- **25 were stale** (photos the user had deleted from the camera
+  between sync sessions)
+
+The strategy never prunes. For a multi-year card-rotation user this
+becomes index bloat (estimate: ~50 bytes/entry → ~50 KB per 1000
+deleted photos). Doesn't break dedupe, but worth fixing.
+
+**Recommended cleanup pass at sync end:** remove index entries whose
+path wasn't seen in the current listing. This won't affect any
+correctness property — those entries are pure ghosts. Add to both
+iOS and Android implementations.
+
+### Filename reuse case (not yet observed in the wild)
+
+Test case 4 in this doc describes filename reuse (camera deletes
+`IMG_0001.JPG`, takes a new one with the same name but different
+size). Not observed in real hardware testing because the Canon
+camera kept counting `IMG_8023 → IMG_8577` without recycling
+numbers. The synthetic mock-server test exercises this case and the
+dedupe behaves correctly.
+
+### Note on example paths
+
+This document uses `/DCIM/100CANON/…` as the canonical example
+because it's the most familiar DCIM convention. **Real cards use
+whatever subdir naming the camera firmware chose** —
+Toshiba's FlashAir creates `/DCIM/100__TSB/`, Nikon uses
+`/DCIM/100NIKON/`, etc. The strategy is name-agnostic; only the
+walker needs to handle the variation. See `docs/REAL-WORLD-FINDINGS.md`.
+
 ---
 
-**Version:** 1.0
-**Last Updated:** 2025-01-15
+**Version:** 1.1
+**Last Updated:** 2026-06-05 (added real-world validation section,
+monotonic-growth note, and DCIM-naming clarification)
