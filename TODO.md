@@ -33,6 +33,24 @@ multi-file or some research · **L** ≈ substantial, may span sessions.
       thumbnail via `PHImageManager.requestImage(for:targetSize:…)` at
       a small size (e.g. 64pt), display it in a corner of `progressSection`.
       Surfaced from real-world photo-shoot use on 2026-06-03. _Effort: M._
+- [ ] **Differentiate import-complete alert by outcome.** Today the
+      Import Complete alert renders the same shape whether you imported
+      170 / 0 failed (clean win), 5 / 168 already-synced / 0 failed
+      (re-sync no-op), or 28 / 4 failed (partial sync with real errors).
+      The photographer can't tell at a glance whether they need to do
+      anything. Surfaced from the 2026-06-08 real-shoot session where
+      the user hit `network connection lost` + timeouts mid-sync.
+      Plan: drive alert title/color/icon from outcome:
+      * "✅ Import Complete" — all attempted files imported.
+      * "⚠️ Imported with errors" — some files failed; surface a "Retry
+        failed (N)" affordance.
+      * "ℹ️ Nothing new to import" — `alreadySyncedCount == totalFiles`,
+        no work done.
+      * "❌ Sync failed" — whole-sync error path (existing red banner can
+        merge into this).
+      Each variant keeps the existing counts but the headline tells the
+      user whether the run was a win, a no-op, or needs attention.
+      _Effort: S._
 - [ ] **Dedicated "FlashAir" album in Photos.** iOS analog of Android's
       `Pictures/FlashAirImport/`. Currently imports save into the main
       Photos Library at their FAT capture date — you can find them via
