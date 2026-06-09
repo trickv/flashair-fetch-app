@@ -88,8 +88,15 @@ actor SyncEngine {
                 items[i].state = .downloading(progress: 0.0)
                 await progressCallback(items)
 
-                // Download file (TODO: add progress tracking)
-                let localURL = try await client.downloadFile(entry.absolutePath)
+                // Download file (TODO: add progress tracking).
+                // expectedSize is checked inside downloadFile — a truncated
+                // response (e.g. camera-sleep mid-transfer) throws
+                // FlashAirError.sizeMismatch before this returns, so
+                // saveToPhotos never sees a bad file.
+                let localURL = try await client.downloadFile(
+                    entry.absolutePath,
+                    expectedSize: entry.size
+                )
 
                 // Update state: saving
                 items[i].state = .saving
@@ -127,6 +134,21 @@ actor SyncEngine {
                 await progressCallback(items)
 
                 print("❌ Failed: \(entry.name) - \(errorMsg)")
+                await Logger.shared.logError("Per-file failure \(entry.name): \(errorMsg)")
+
+                // Capture per-file failures to Sentry so beta-tester reports
+                // come with breadcrumb context (which file, expected size,
+                // sync progress). Previously only the whole-sync lifecycle
+                // catch (in ImportViewModel) reached Sentry, which meant a
+                // sync that completed-with-failures landed only a vanilla
+                // sync_completed message — no signal on what failed.
+                Telemetry.capture(error, extra: [
+                    "phase": "per_file_download",
+                    "file": entry.name,
+                    "path": entry.absolutePath,
+                    "expected_size": entry.size,
+                    "progress": "\(i + 1) of \(items.count)",
+                ])
             }
         }
 

@@ -202,6 +202,12 @@ enum FlashAirError: LocalizedError {
     case permissionDenied
     case cancelled
     case wifiConnectionFailed
+    /// The downloaded file's byte count didn't match what the CSV listing
+    /// advertised. Most commonly: the camera went to sleep mid-transfer and
+    /// the connection closed cleanly enough that URLSession treated the
+    /// partial response as success. Thrown before any Photos save so we
+    /// never commit a truncated file to the library.
+    case sizeMismatch(path: String, expected: Int, actual: Int)
 
     var errorDescription: String? {
         switch self {
@@ -219,6 +225,8 @@ enum FlashAirError: LocalizedError {
             return "Operation cancelled"
         case .wifiConnectionFailed:
             return "Failed to connect to FlashAir Wi-Fi network"
+        case .sizeMismatch(let path, let expected, let actual):
+            return "Truncated download of \(path): expected \(expected) bytes, got \(actual). The camera may have gone to sleep mid-transfer."
         }
     }
 }
