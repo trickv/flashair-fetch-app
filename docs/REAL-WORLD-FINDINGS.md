@@ -135,6 +135,15 @@ JPEG bytes verbatim, so the hash matches what you'd get from a direct
 SD-card offload. **Filename is for human visibility; hash is what
 prevents re-upload duplication.**
 
+**Verified at scale on 2026-06-09:** the user pulled the SD card out
+of the camera, plugged it into their laptop, and imported every JPG
+directly into Immich. Immich detected **all 337 files as duplicates**
+of photos already in the library — confirming the entire pipeline
+(FlashAir → iOS download → `PHAssetCreationRequest` → Photos library →
+iCloud sync → Immich's iOS uploader → server) preserves byte
+identity. No re-encoding or transcoding happens at any link. The
+"bridge for iCloud/Google Photos/Immich users" goal is proven.
+
 **Android equivalent:** `ContentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, entry.name)`
 when inserting into MediaStore. Should already be doing this; verify.
 

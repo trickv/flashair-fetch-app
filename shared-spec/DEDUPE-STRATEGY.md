@@ -494,6 +494,40 @@ Toshiba's FlashAir creates `/DCIM/100__TSB/`, Nikon uses
 `/DCIM/100NIKON/`, etc. The strategy is name-agnostic; only the
 walker needs to handle the variation. See `docs/REAL-WORLD-FINDINGS.md`.
 
+### End-to-end byte-fidelity check (2026-06-09)
+
+`path#size` is the *app-internal* dedupe key. But the iOS app's value
+proposition for Immich/iCloud/Google Photos users depends on a
+stricter guarantee: that the bytes saved to the device's photo
+library are **identical** to what's on the card. Downstream services
+(notably Immich) dedupe by **content hash** (sha1 of bytes), not
+filename or size.
+
+**Test:** after a series of FlashAir-Sync runs had imported 337 JPGs
+into iCloud Photos, the user removed the SD card, plugged it into
+their laptop, and uploaded every JPG into Immich via its desktop/
+web uploader (which content-hashes each file).
+
+**Result:** Immich detected **all 337 files as duplicates** of photos
+already in the library (uploaded earlier via Immich's iOS app reading
+from the user's iCloud Photos).
+
+**What this proves:** the entire chain preserves byte identity —
+
+```
+FlashAir card
+  → URLSession.download (size-verified post-2026-06-09)
+  → PHAssetCreationRequest.addResource(with: .photo, fileURL:)
+  → iCloud Photo Library sync
+  → Immich's iOS uploader
+  → Immich server content-hash
+== sha1 of the original on-card file
+```
+
+No re-encoding or transcoding at any step. This is the core
+behavioral guarantee for using FlashAir Sync as a "bridge" to a
+content-addressed photo store.
+
 ---
 
 **Version:** 1.1
