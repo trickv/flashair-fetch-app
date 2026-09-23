@@ -180,10 +180,16 @@ listing. Applies to both platforms.
 iOS-specific but worth documenting since it cost us a real-time
 debugging session before we figured it out.
 
-`xcrun devicectl device process launch --console com.flashairsync`
+`xcrun devicectl device process launch --console us.v9n.flashair-sync`
 over **USB tether** streams `print()` and `Logger` output live and
 **survives the Wi-Fi handoff** when the app joins the FlashAir
 network.
+
+That trailing argument is the **installed app's** bundle identifier,
+so it has to track `project.yml`. It was `com.flashairsync` through
+the 2026-05 hardware sessions and is `us.v9n.flashair-sync` as of the
+App Store rename (2026-08-13); the stale form fails with no matching
+application rather than anything that points at the real cause.
 
 The same `--console` invocation over **Wi-Fi-paired** debugging dies
 the moment `NEHotspotConfiguration.apply()` switches networks — the

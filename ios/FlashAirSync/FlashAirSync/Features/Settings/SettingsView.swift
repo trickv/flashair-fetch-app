@@ -64,8 +64,10 @@ struct SettingsView: View {
                     Text("""
                     On by default. Sends anonymous crash reports and sync \
                     metrics (file counts, durations, success/failure) to help \
-                    improve the app. No photo content, no filenames, no personal \
-                    information. Takes effect immediately; full crash-report \
+                    improve the app. No photo content and no personal \
+                    information; if an individual file fails to download, its \
+                    filename and path on the card are included so the failure \
+                    is actionable. Takes effect immediately; full crash-report \
                     coverage starts on next app launch. Toggle off at any time.
                     """)
                 }
@@ -118,6 +120,15 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("About")
+                } footer: {
+                    // Trademark attribution. The app's name uses the FlashAir
+                    // mark nominatively (to say what hardware it works with),
+                    // which is the defensible use — but only when ownership is
+                    // attributed and non-affiliation is stated. Keep this in
+                    // sync with the App Store description footer; App Review
+                    // guideline 5.2.1 covers metadata in the bundle, not just
+                    // the store listing. See docs/APP-STORE-RELEASE.md.
+                    Text("FlashAir is a trademark of Kioxia Corporation (formerly Toshiba Memory Corporation). This app is an independent open-source project and is not affiliated with, endorsed by, or sponsored by Kioxia or Toshiba.")
                 }
             }
             .navigationTitle("Settings")

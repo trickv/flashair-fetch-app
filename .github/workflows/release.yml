@@ -1,0 +1,302 @@
+name: Release
+
+# iOS only. The Android app in android/ is deliberately not published — there is
+# no Play Store job here and adding one is a separate decision, not an oversight.
+#
+# Triggered by *publishing* a GitHub Release, not by pushing a tag. `git push
+# --tags` alone does nothing; the release has to be published in the UI/CLI.
+on:
+  release:
+    types: [published]
+  # Escape hatch for the common half-failure: the archive succeeds and the App
+  # Store Connect upload doesn't (expired key, network, a compliance gate). Without
+  # this the only recovery is deleting and re-publishing the GitHub Release.
+  # `version` is required because github.event.release.tag_name is empty off a
+  # release event.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Marketing version, e.g. 0.1.0 (a leading "v" is stripped)'
+        required: true
+      notes:
+        description: 'TestFlight "What to Test" text'
+        required: false
+        default: 'Manual build.'
+
+# Two releases uploading to App Store Connect at once is never what you want, and
+# a cancelled run can leave a half-uploaded build — so queue, never cancel.
+concurrency:
+  group: ios-release
+  cancel-in-progress: false
+
+jobs:
+  ios-testflight:
+    name: iOS → TestFlight
+    # Opt-out tag: put [skip-ios] anywhere in the GitHub Release body to publish
+    # the release (tag, notes, assets) without shipping a TestFlight build —
+    # docs-only or Android-only releases, or re-cutting a tag after a bad build.
+    # The "Compose TestFlight release notes" step strips the tag from the
+    # "What to Test" text, and this guard is what actually honours it; without
+    # the pair, typing [skip-ios] would silently upload anyway with the tag
+    # quietly deleted from the notes — the exact opposite of what was asked for.
+    # Same tag as ../baby-monitor and ../look-up, so muscle memory carries over.
+    # workflow_dispatch is exempt: a manual run is an explicit "build this now",
+    # and github.event.release is empty there anyway (contains() on an empty
+    # string is false, but being explicit documents the intent).
+    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.release.body, '[skip-ios]') }}
+    # App Store Connect rejects uploads not built with the iOS 26 SDK. macos-26
+    # ships a Xcode 26.x default toolchain, which satisfies that on its own — so
+    # unlike baby-monitor (macos-15, Xcode 16 default) there is no
+    # setup-xcode/xcode-select step here. Deliberately left unpinned: Apple keeps
+    # raising the minimum SDK, and tracking the image default satisfies each
+    # raise for free, where a pin would silently fall below it. The cost is that
+    # the dev Mac (Xcode 27.0 as of 2026-09-23) no longer reproduces CI's
+    # toolchain exactly — local green is strong evidence, not proof. To pin:
+    #   - uses: maxim-lobanov/setup-xcode@v1
+    #     with: { xcode-version: '26.6' }
+    # The "Show toolchain" step below is what makes such a rotation visible.
+    runs-on: macos-26
+    timeout-minutes: 60
+    permissions:
+      contents: write  # only the release-asset upload needs this
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        # project.yml's postBuildScripts stamps `git describe --always --dirty`
+        # into the built bundle (shown in Settings → About). The default shallow
+        # checkout fetches no tags, so that would read as a bare short hash
+        # instead of "v0.1.0".
+        fetch-depth: 0
+        # Nothing here pushes. Don't leave a usable token in .git/config while an
+        # unpinned gem tree (fastlane + deps) executes in the same job.
+        persist-credentials: false
+
+    - name: Show toolchain
+      run: |
+        xcodebuild -version
+        echo "Active developer dir: $(xcode-select -p)"
+        echo "iOS SDK: $(xcrun --sdk iphoneos --show-sdk-version)"
+
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.2'
+        # The one cache worth having in this job. Note there is no committed
+        # Gemfile.lock (matching baby-monitor/look-up), so fastlane's version
+        # floats run to run; setup-ruby resolves and keys its cache on the
+        # lockfile it generates.
+        bundler-cache: true
+
+    # XcodeGen is not preinstalled on the runner image. There is a prebuilt
+    # arm64 bottle, so this is a download-and-link, not a SwiftPM build from
+    # source. HOMEBREW_NO_AUTO_UPDATE skips brew's ~30-60s self-update.
+    - name: Install XcodeGen
+      env:
+        HOMEBREW_NO_AUTO_UPDATE: '1'
+        HOMEBREW_NO_INSTALL_CLEANUP: '1'
+      run: |
+        brew install xcodegen
+        xcodegen --version
+
+    # The .xcodeproj is gitignored — it does not exist until this runs, and
+    # fastlane cannot open it before that.
+    #
+    # If the Fastfile also runs `xcodegen generate` at the top of the lane, that
+    # is harmless: generation is idempotent, and the lane's own generate happens
+    # *before* it writes signing settings into the pbxproj, so nothing gets
+    # clobbered. Doing it here as well buys a clear, ~30s-in failure on a broken
+    # project.yml instead of an opaque one four minutes into the lane.
+    - name: Generate Xcode project
+      working-directory: ios/FlashAirSync
+      run: xcodegen generate
+
+    - name: Resolve version and build number
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        TAG_NAME: ${{ github.event.release.tag_name }}
+        INPUT_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        if [ "$EVENT_NAME" = "release" ]; then
+          VERSION="${TAG_NAME#v}"
+        else
+          VERSION="${INPUT_VERSION#v}"
+        fi
+        # CFBundleShortVersionString must be 1-3 period-separated integers. A tag
+        # like v0.1.0-rc1 builds fine and is then rejected by App Store Connect
+        # after the upload — catch it in two seconds instead.
+        if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+(\.[0-9]+){0,2}$'; then
+          echo "::error::'$VERSION' is not a valid CFBundleShortVersionString (expected e.g. 0.1.0). Tag releases as vN.N.N."
+          exit 1
+        fi
+        # Exported for the Fastfile. GITHUB_REF_NAME / GITHUB_RUN_NUMBER are also
+        # in the environment, but on a workflow_dispatch run GITHUB_REF_NAME is a
+        # branch name ("main"), so the lane must prefer these.
+        echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
+        echo "APP_BUILD=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+        echo "Building $VERSION (build ${GITHUB_RUN_NUMBER})"
+
+    - name: Import distribution certificate
+      env:
+        BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+        P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+        KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      run: |
+        set -euo pipefail
+        umask 077
+        CERT_PATH="$RUNNER_TEMP/certificate.p12"
+        KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+
+        echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o "$CERT_PATH"
+
+        security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+        # Auto-lock after an hour; the job cap is 60 minutes.
+        security set-keychain-settings -lut 3600 "$KEYCHAIN_PATH"
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+        # `-T <tool>` rather than baby-monitor's `-A`: grant key access to the two
+        # binaries that actually sign, not to every process in the job (fastlane
+        # pulls in a large third-party gem tree). This is what `fastlane match`
+        # itself does. If signing ever fails with an ACL/prompt error, swapping
+        # these two flags back to `-A` is the one-line fallback.
+        security import "$CERT_PATH" -P "$P12_PASSWORD" \
+          -t cert -f pkcs12 -k "$KEYCHAIN_PATH" \
+          -T /usr/bin/codesign -T /usr/bin/security
+        # Without this codesign blocks on a UI prompt that no one can answer.
+        security set-key-partition-list -S apple-tool:,apple: \
+          -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" >/dev/null
+        security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+        rm -f "$CERT_PATH"  # the private key lives in the keychain now
+
+    - name: Install provisioning profile
+      env:
+        BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+      run: |
+        set -euo pipefail
+        umask 077
+        PP_NAME="flashair-sync.mobileprovision"
+        # Xcode 16+ reads profiles from the UserData path; older tooling reads the
+        # MobileDevice one. Both are one `cp` and removes the question entirely.
+        LEGACY_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+        MODERN_DIR="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+        mkdir -p "$LEGACY_DIR" "$MODERN_DIR"
+        echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o "$LEGACY_DIR/$PP_NAME"
+        cp "$LEGACY_DIR/$PP_NAME" "$MODERN_DIR/$PP_NAME"
+
+        # Preflight. FlashAirSync.entitlements declares HotspotConfiguration (the
+        # NEHotspotConfiguration join is the whole app). A profile without that
+        # capability fails ~8 minutes later as an opaque export error, so check it
+        # here where the message can be useful.
+        security cms -D -i "$LEGACY_DIR/$PP_NAME" > "$RUNNER_TEMP/pp.plist"
+        echo "Profile name: $(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/pp.plist")"
+        echo "Expires:      $(/usr/libexec/PlistBuddy -c 'Print :ExpirationDate' "$RUNNER_TEMP/pp.plist")"
+        /usr/libexec/PlistBuddy \
+          -c 'Print :Entitlements:com.apple.developer.networking.HotspotConfiguration' \
+          "$RUNNER_TEMP/pp.plist" >/dev/null 2>&1 || {
+            echo "::error::Provisioning profile lacks com.apple.developer.networking.HotspotConfiguration. Enable the Hotspot capability on the us.v9n.flashair-sync App ID, regenerate the 'flashair-sync' profile, and refresh BUILD_PROVISION_PROFILE_BASE64."
+            exit 1
+          }
+        rm -f "$RUNNER_TEMP/pp.plist"
+
+    - name: Write App Store Connect API key
+      env:
+        ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+        ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+      run: |
+        set -euo pipefail
+        umask 077
+        mkdir -p "$HOME/.appstoreconnect/private_keys"
+        KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
+        echo -n "$ASC_API_KEY_BASE64" | base64 --decode -o "$KEY_PATH"
+        chmod 600 "$KEY_PATH"
+        echo "ASC_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+
+    - name: Compose TestFlight release notes
+      env:
+        RAW_NOTES: ${{ github.event.release.body }}
+        INPUT_NOTES: ${{ inputs.notes }}
+      run: |
+        set -euo pipefail
+        # The body arrives via env, never as an inline ${{ }} substitution, so
+        # quotes/backticks/$(...) in a release body cannot break the shell parse.
+        # No byte truncation here: pilot enforces Apple's 4000-char "What to Test"
+        # limit itself, and byte-slicing UTF-8 is how baby-monitor's Play Store
+        # changelog got mangled.
+        NOTES=$(printf '%s' "${RAW_NOTES:-${INPUT_NOTES:-}}" \
+          | sed 's/\[skip-[a-z]*\]//g' \
+          | sed 's/^[[:space:]]*//')
+        [ -n "$NOTES" ] || NOTES="Bug fixes and improvements."
+        # Randomised delimiter: a release body containing a bare "EOF" line would
+        # otherwise escape the heredoc and let arbitrary text set env vars for
+        # every later step.
+        DELIM="EOF_$(openssl rand -hex 16)"
+        {
+          echo "RELEASE_NOTES<<$DELIM"
+          printf '%s\n' "$NOTES"
+          echo "$DELIM"
+        } >> "$GITHUB_ENV"
+
+    - name: Build & upload to TestFlight
+      env:
+        ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+        ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        # APP_VERSION, APP_BUILD, RELEASE_NOTES and ASC_API_KEY_PATH are already
+        # in the environment via $GITHUB_ENV from the steps above.
+        #
+        # SENTRY_AUTH_TOKEN is deliberately not passed: an unset secret expands to
+        # "", and ENV["SENTRY_AUTH_TOKEN"] == "" is truthy in Ruby, so passing it
+        # would make a guarded dSYM-upload step think it is configured. Add it here
+        # only once the Fastfile actually uploads dSYMs.
+      run: bundle exec fastlane ios beta
+
+    # gym writes the .ipa (and FlashAirSync.app.dSYM.zip beside it) to its
+    # output_directory, which resolves to the repo root — fastlane chdirs actions
+    # to the parent of fastlane/. Verify that before the upload step silently
+    # publishes a release with zero assets.
+    - name: Verify build outputs
+      run: |
+        set -uo pipefail
+        ls -la ./*.ipa ./*.dSYM.zip 2>/dev/null || true
+        if [ -z "$(find . -maxdepth 1 -name '*.ipa' -print -quit)" ]; then
+          echo "::error::no .ipa at the repo root — check the Fastfile's build_app output_directory"
+          exit 1
+        fi
+
+    - name: Attach IPA and dSYMs to the GitHub Release
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v2
+      with:
+        # dSYMs are attached because this app ships Sentry; without archived
+        # dSYMs every TestFlight crash report is unsymbolicated hex.
+        files: |
+          *.ipa
+          *.dSYM.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # A workflow_dispatch run has no release to attach assets to.
+    - name: Upload IPA and dSYMs as artifacts (manual runs)
+      if: github.event_name == 'workflow_dispatch'
+      uses: actions/upload-artifact@v4
+      with:
+        name: FlashAirSync-ipa
+        path: |
+          *.ipa
+          *.dSYM.zip
+        if-no-files-found: error
+        retention-days: 30
+
+    - name: Clean up keychain, profile and API key
+      if: always()
+      run: |
+        security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" 2>/dev/null || true
+        # list-keychain -s above *replaced* the user search list; restore it. Moot
+        # on a throwaway hosted runner, load-bearing if this ever runs self-hosted.
+        security list-keychain -d user -s login.keychain-db 2>/dev/null || true
+        rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/flashair-sync.mobileprovision"
+        rm -f "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/flashair-sync.mobileprovision"
+        rm -f "$HOME"/.appstoreconnect/private_keys/AuthKey_*.p8
+        rm -f "$RUNNER_TEMP/certificate.p12"

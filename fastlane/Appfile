@@ -1,0 +1,16 @@
+# fastlane/Appfile — defaults fastlane resolves on its own when an action
+# isn't given an explicit value. The Fastfile still passes both of these
+# explicitly; this file is what makes `resolve_team_id!` work locally when
+# APPLE_TEAM_ID isn't exported.
+#
+# Keep in sync with fastlane/Fastfile (APP_IDENTIFIER) and with
+# ios/FlashAirSync/project.yml (PRODUCT_BUNDLE_IDENTIFIER).
+#
+# No `for_platform :android` block, unlike ../baby-monitor and ../look-up:
+# the Android app in android/ is not published.
+#
+# No apple_id() either — authentication is App Store Connect API key only
+# (ASC_API_KEY_ID / ASC_API_ISSUER_ID / ASC_API_KEY_PATH), which avoids
+# Apple ID + 2FA session prompts in CI.
+app_identifier("us.v9n.flashair-sync")
+team_id("99CP4GY776")

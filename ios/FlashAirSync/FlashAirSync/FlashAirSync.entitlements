@@ -5,12 +5,18 @@
 	<!--
 		Hotspot Configuration: required by WiFiJoiner to call
 		NEHotspotConfiguration and join the FlashAir card's WiFi network.
-		Apple gates this capability — you must request it for the bundle ID
-		in the Apple Developer Portal (Certificates → Identifiers → your
-		app ID → Capabilities → Hotspot Configuration → Enable) before the
-		entitlement actually grants the API at runtime. Local development
-		builds work without approval; archives for TestFlight/App Store
-		will not.
+
+		This is an *unmanaged* entitlement: tick Hotspot on the App ID
+		(Certificates → Identifiers → us.v9n.flashair-sync → Capabilities)
+		and it is yours immediately. No request form, no Apple review — that
+		is NEHotspotHelper, a different, managed entitlement this app does
+		not use. Earlier versions of this comment said otherwise; they were
+		wrong.
+
+		What does bite: the capability has to be enabled on the App ID
+		*before* the distribution provisioning profile is generated, or the
+		archive fails with "Provisioning profile … doesn't support the
+		Hotspot Configuration capability". Simulator builds don't care.
 	-->
 	<key>com.apple.developer.networking.HotspotConfiguration</key>
 	<true/>

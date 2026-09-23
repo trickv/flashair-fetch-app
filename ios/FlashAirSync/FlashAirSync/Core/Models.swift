@@ -78,8 +78,11 @@ struct SyncSettings: Codable {
     /// Per-sync upload cap. `nil` = no cap (sync every new file). Optional + default
     /// so missing key in previously-stored UserDefaults JSON decodes cleanly as nil.
     var maxFilesPerSync: Int? = nil
-    /// Opt-in to sending crash/error/usage telemetry via Sentry. `nil` = not yet
-    /// opted in (treated as false). Optional + default for the same forward-
+    /// Sending crash/error/usage telemetry via Sentry. `nil` = the user has never
+    /// touched the toggle, which is treated as ENABLED — `Telemetry.startIfEnabled`
+    /// guards on `!= false`, so only an explicit opt-OUT stops it. Do not "correct"
+    /// this to opt-in without changing that guard, `PRIVACY.md`, the Settings
+    /// footer, and the App Privacy answers together. Optional + default for the same forward-
     /// compatibility reason as `maxFilesPerSync` above — adding a non-optional
     /// field would throw `.keyNotFound` when decoding previously-stored JSON.
     var telemetryEnabled: Bool? = nil

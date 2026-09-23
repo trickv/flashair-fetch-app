@@ -17,14 +17,22 @@ Wi-Fi. This is gated by the
 
 - **Development on your registered device:** works as soon as the
   entitlement is in the file (already there).
-- **TestFlight / App Store:** Apple has to grant the capability on
-  the bundle ID at the **Apple Developer Portal → Certificates,
-  Identifiers & Profiles → Identifiers → `com.flashairsync` →
-  Capabilities → Hotspot Configuration**. Then regenerate
-  provisioning profiles.
-- **Heads-up from the README:** Apple has historically denied this
-  capability for hobby apps. **Request it early** — before you've
-  invested too much in the iOS path — to fail fast if denied.
+- **TestFlight / App Store:** tick the capability on the bundle ID at
+  the **Apple Developer Portal → Certificates, Identifiers & Profiles
+  → Identifiers → `us.v9n.flashair-sync` → Capabilities → Hotspot**,
+  then regenerate the provisioning profile.
+- **Correction (2026-08-13):** this doc used to say Apple has to
+  "grant" the capability and "has historically denied it for hobby
+  apps." That is **wrong**.
+  `com.apple.developer.networking.HotspotConfiguration` is an
+  *unmanaged* entitlement — a self-serve checkbox available to any
+  paid Apple Developer Program membership, with no request form and
+  no approval wait. The denial story belongs to `NEHotspotHelper`
+  (`…networking.HotspotHelper`) and to
+  `…networking.multicast`, both of which are request-gated and
+  neither of which this app uses. See
+  `docs/APP-STORE-RELEASE.md` step 2 for the click path and for the
+  confidence caveat on this claim.
 
 ### Sentry telemetry default
 
@@ -33,8 +41,15 @@ The app's telemetry is **default ON** for beta testers (commit
 
 > This beta sends anonymous crash reports and sync metrics (file
 > counts, durations, success/failure) to help us improve the app. No
-> photo content, no filenames, no personal information. Toggle off
-> at any time via Settings → Privacy.
+> photo content and no personal information; if an individual file
+> fails to download, its filename is included so the failure is
+> actionable. Toggle off at any time via Settings → Privacy.
+
+**Do not claim "no filenames."** `SyncEngine`'s per-file failure path
+logs `entry.name` (which `Logger.log` bridges to a Sentry breadcrumb)
+and captures `file` / `path` as event extras. Filenames genuinely do
+reach Sentry on failures — `PRIVACY.md` says so, and the tester-facing
+notes have to match.
 
 If you want the App Store / general public version to default OFF
 instead, flip the binding `?? true` → `?? false` and the
@@ -47,7 +62,7 @@ You'll see events tagged:
 
 - `environment: debug` for Debug builds (default for sideload/dev)
 - `environment: release` for TestFlight / App Store builds
-- `release: com.flashairsync@<version>+<build>`
+- `release: us.v9n.flashair-sync@<version>+<build>`
 
 Filter by `environment:release` in Sentry to focus on real beta
 testers vs. your own dev builds.
@@ -72,31 +87,48 @@ the event is sent.
 
 ## iOS pre-submission checklist
 
-Before submitting a build:
+Before submitting a build. **Note the release is now automated** — see
+`docs/APP-STORE-RELEASE.md`; you tag and publish a GitHub Release, and
+CI signs, archives and uploads to TestFlight.
 
-- [ ] **Team set** in Xcode → Signing & Capabilities (`DEVELOPMENT_TEAM`
-      is intentionally not committed in `project.yml`).
-- [ ] **Hotspot Configuration** capability enabled on the App ID in
-      the developer portal.
+- [ ] **Team set** in Xcode → Signing & Capabilities for *local device*
+      builds (`DEVELOPMENT_TEAM` is intentionally not committed in
+      `project.yml`). CI doesn't need this — fastlane writes the team
+      from the `APPLE_TEAM_ID` secret.
+- [ ] **Hotspot** capability enabled on the App ID
+      (`us.v9n.flashair-sync`) in the developer portal, and present in
+      the downloaded profile (`security cms -D -i … | plutil -extract
+      Entitlements xml1 -o - -`).
 - [ ] **Privacy strings** in `Info.plist` (XcodeGen-generated from
       `project.yml`):
   - `NSPhotoLibraryAddUsageDescription`
-  - `NSPhotoLibraryUsageDescription`
   - `NSLocalNetworkUsageDescription`
+  - **Not** `NSPhotoLibraryUsageDescription` — `PhotoSaver` only ever
+    *adds* (`.addOnly`), and advertising full library read access
+    invites a 5.1.1 question at review. Drop it if it's still in
+    `project.yml`.
 - [ ] **Cleartext HTTP exception**:
       `NSAppTransportSecurity.NSAllowsLocalNetworking` in `Info.plist`.
 - [ ] **Sentry DSN** is committed in `Info.plist` (`SentryDSN` key,
       populated via `project.yml` `info.properties`) — **public per
       Sentry docs, safe to commit**.
-- [ ] Bump `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in
-      `project.yml` `targets.FlashAirSync.settings`.
-- [ ] Run `xcodegen generate`.
-- [ ] **Build Archive** (Product → Archive) — verify the
-      `postBuildScripts` git-commit-hash injection ran (visible in
-      Settings → About after install).
+- [ ] **Do NOT hand-bump `MARKETING_VERSION` /
+      `CURRENT_PROJECT_VERSION`.** The release pipeline derives the
+      marketing version from the git tag and the build number from
+      `GITHUB_RUN_NUMBER`; the values in `project.yml` are a fallback
+      for local builds only.
+- [ ] Run `xcodegen generate` and commit
+      `ios/FlashAirSync/FlashAirSync/Info.plist` if it changed —
+      otherwise CI regenerates it, the tree goes dirty, and every
+      shipped build is stamped `GitCommitHash = <sha>-dirty`.
 - [ ] Smoke-test against the local mock server in the Simulator.
 - [ ] Smoke-test against the real card on the device.
-- [ ] Upload via Xcode Organizer.
+- [ ] **Ship it:** `git tag vX.Y.Z && git push origin vX.Y.Z`, then
+      publish a GitHub Release — that's what triggers the build and
+      the TestFlight upload. Xcode Organizer is no longer part of the
+      path. Full walkthrough in `docs/APP-STORE-RELEASE.md`.
+- [ ] After install, verify the `postBuildScripts` git-commit-hash
+      injection landed (Settings → About).
 
 ## What to put in TestFlight release notes
 
@@ -117,8 +149,10 @@ Known limitations
 
 Privacy
 - Anonymous crash reports and sync metrics are sent to Sentry to help us
-  improve the app. No photo content, no filenames, no personal info.
+  improve the app. No photo content and no personal info. If a file fails
+  to download, its filename is included so we can chase the bug.
 - Toggle off via Settings → Privacy at any time.
+- Full policy: https://github.com/trickv/flashair-fetch-app/blob/main/PRIVACY.md
 
 Troubleshooting
 - If sync fails with "request timed out": your camera may have gone to sleep.
@@ -140,8 +174,10 @@ calls.
   entitlement to provision (see above). Personal/free Apple IDs
   cannot generate provisioning profiles that include this
   entitlement.
-- Team ID lives in your Xcode project settings; not committed in
-  these docs to keep team IDs out of grep.
+- The team ID now lives in `fastlane/Appfile` (and in the
+  `APPLE_TEAM_ID` repo secret) rather than only in local Xcode
+  settings — `DEVELOPMENT_TEAM` is still deliberately absent from
+  `project.yml`.
 
 ## Android (when it's ready for beta)
 
@@ -161,6 +197,10 @@ end-to-end). When it gets there:
 
 ## See also
 
+- `docs/APP-STORE-RELEASE.md` — one-time Apple/GitHub setup, the
+  automated release path, and App Store submission
+- `PRIVACY.md` — the published privacy policy (required URL for
+  TestFlight external testing and App Store submission)
 - `README.md` "Quick Start" — initial build setup
 - `CLAUDE.md` "Local-environment Constraints" — XcodeGen, cleartext,
   signing notes

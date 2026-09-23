@@ -7,18 +7,29 @@
 # The generated .xcodeproj is intentionally NOT committed — regenerate
 # from this file. Change targets/settings here, not in Xcode's UI.
 #
-# Before first build:
-#   1. Open FlashAirSync.xcodeproj in Xcode.
-#   2. Select the FlashAirSync target → Signing & Capabilities → set "Team"
-#      to your Apple Developer team. Without this, the build will fail
-#      with a "Signing for FlashAirSync requires a development team" error.
-#   3. (Optional) Change PRODUCT_BUNDLE_IDENTIFIER below if `com.flashairsync`
-#      conflicts with another app in your Apple Developer account.
+# Signing — two different stories, neither of them stored in this file:
+#   * Local device builds: open FlashAirSync.xcodeproj, select the
+#     FlashAirSync target → Signing & Capabilities → set "Team". Without it
+#     the build fails with "Signing for FlashAirSync requires a development
+#     team". DEVELOPMENT_TEAM is deliberately never committed, so a fresh
+#     clone always asks once. Simulator builds need nothing.
+#   * CI / TestFlight: `bundle exec fastlane ios beta` regenerates this
+#     project, then flips it to manual signing and injects the team, the
+#     "Apple Distribution" identity and the "flashair-sync" App Store
+#     provisioning profile into the generated (throwaway) pbxproj.
+#
+# Bundle ID is us.v9n.flashair-sync — the App ID registered in the Apple
+# Developer Portal, and what the "flashair-sync" distribution profile is
+# issued against. Changing it here without re-issuing that profile breaks
+# the release build, not the simulator build, so the failure shows up late.
 #
 # Hotspot Configuration entitlement: declared in FlashAirSync.entitlements.
-# Requires Apple approval per app — request via the "Network Extensions"
-# / "Hotspot Configuration" capability in Apple Developer Portal before
-# submitting to TestFlight/App Store. Local development works without it.
+# It is an *unmanaged* entitlement — a self-serve checkbox on the App ID
+# (Certificates → Identifiers → us.v9n.flashair-sync → Capabilities →
+# Hotspot). There is no request form and no Apple approval wait; that's
+# NEHotspotHelper, a different, managed entitlement this app does not use.
+# The capability must be ticked on the App ID *before* the distribution
+# profile is generated, or the archive fails at the signing step.
 
 name: FlashAirSync
 
@@ -71,10 +82,26 @@ targets:
     type: application
     platform: iOS
     sources:
+      # Whole-directory glob: Assets.xcassets is picked up as a resource by
+      # being inside it. The excludes list is the two files Xcode consumes as
+      # *settings* rather than as build inputs, plus PrivacyInfo.xcprivacy which
+      # is re-added below with an explicit build phase — don't grow it into a
+      # wildcard or the asset catalog can silently drop out.
       - path: FlashAirSync
         excludes:
           - "Info.plist"
           - "FlashAirSync.entitlements"
+          - "PrivacyInfo.xcprivacy"
+      # App privacy manifest (ITMS-91053). The glob above would classify it as a
+      # resource today purely by XcodeGen's "unknown extension ⇒ resource"
+      # default; this says so out loud, because the whole point of the file is
+      # that it must end up at the .app *root* where Apple's upload scanner
+      # looks, and a silent reclassification (the way .entitlements is special-
+      # cased into no build phase at all) would ship a binary with no manifest
+      # and no build error. Copy Resources flattens it out of FlashAirSync/.
+      # Verify with: ls "$BUILT_PRODUCTS_DIR/FlashAirSync.app/PrivacyInfo.xcprivacy"
+      - path: FlashAirSync/PrivacyInfo.xcprivacy
+        buildPhase: resources
     dependencies:
       - package: Sentry
         product: Sentry
@@ -82,9 +109,52 @@ targets:
       path: FlashAirSync/Info.plist
       # Source of truth for Info.plist. XcodeGen regenerates the file from
       # these keys on every `xcodegen generate` — DO NOT hand-edit the plist,
-      # it will be clobbered. CFBundle* keys are supplied by XcodeGen defaults.
+      # it will be clobbered. Unlisted CFBundle* keys come from XcodeGen
+      # defaults; the two version keys below are declared explicitly because
+      # the defaults are wrong for release (see the comment on them).
       properties:
+        # The user-visible name. Deliberately kept as "FlashAir Sync"
+        # (decided 2026-08-13) with the trademark risk understood and
+        # accepted: FlashAir(TM) is a registered mark of Kioxia (formerly
+        # Toshiba Memory), and guideline 5.2.1 covers names/metadata *in the
+        # app bundle*, not just the store listing. The mitigation is
+        # attribution rather than avoidance — Settings -> About carries a
+        # trademark + non-affiliation notice, and the App Store description
+        # must carry the same (see docs/APP-STORE-RELEASE.md, "App name and
+        # trademark attribution"). If Apple ever bounces this on 5.2.1, the
+        # fallback is a neutral store name; changing it here is a one-liner,
+        # but it also has to change in App Store Connect, so do both.
         CFBundleDisplayName: FlashAir Sync
+        # Belt-and-braces. App Store validation looks for CFBundleIconName at
+        # the *top* level (ITMS-90713). An earlier version of this comment
+        # claimed actool writes it only nested inside CFBundleIcons — that was
+        # wrong, and was disproven by dumping a built bundle: with
+        # ASSETCATALOG_COMPILER_APPICON_NAME set, actool writes it in all three
+        # places (top level, CFBundleIcons, CFBundleIcons~ipad). It stays
+        # declared here so the key survives independently of the asset-catalog
+        # step ever being reconfigured or that setting being dropped, which is
+        # also why both of the other shipped apps declare it. Must match
+        # ASSETCATALOG_COMPILER_APPICON_NAME below.
+        CFBundleIconName: AppIcon
+        # These MUST stay build-setting references, not literals. XcodeGen's
+        # default is to write the literal "1.0" / "1" here, which the release
+        # pipeline cannot override: fastlane passes MARKETING_VERSION (from the
+        # git tag) and CURRENT_PROJECT_VERSION (from the CI run number) as
+        # xcodebuild command-line settings, and command-line settings only
+        # reach the bundle if the plist interpolates them. With literals, every
+        # upload would ship as 1.0 (1) and the second one would be rejected for
+        # a duplicate build number. Keeping it a reference also means CI never
+        # rewrites a tracked file, so the postBuildScript below can stamp a
+        # clean git hash instead of "<sha>-dirty".
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        # Export compliance, answered in the binary so TestFlight builds don't
+        # park in "Missing Compliance" waiting for a manual questionnaire.
+        # "false" means "no *non-exempt* encryption", not "no encryption": the
+        # only crypto here is OS-provided TLS (URLSession → Sentry), and the
+        # card itself is plain HTTP. Revisit if custom crypto is ever added —
+        # this is a regulatory declaration attached to the binary.
+        ITSAppUsesNonExemptEncryption: false
         LSRequiresIPhoneOS: true
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: true
@@ -101,8 +171,17 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
+        # Add-only Photos access, and ONLY add-only. The read/write string
+        # (NSPhotoLibraryUsageDescription) is deliberately absent — do not
+        # re-add it. Platform/PhotoSaver.swift asks for `.addOnly` authorization
+        # and writes via PHAssetCreationRequest; nothing in the app fetches or
+        # enumerates existing assets, so requesting full library access would be
+        # asking for a permission we never use. It would also make the binary
+        # contradict PRIVACY.md and the App Review Notes ("ADD-ONLY access …
+        # never reads or enumerates the user's existing library"), which is a
+        # 5.1.1 rejection waiting to happen. If a future feature genuinely needs
+        # to read the library, add the key *and* fix both documents.
         NSPhotoLibraryAddUsageDescription: FlashAir Sync needs access to save photos and videos imported from your FlashAir SD card.
-        NSPhotoLibraryUsageDescription: FlashAir Sync needs access to save photos and videos imported from your FlashAir SD card.
         NSLocalNetworkUsageDescription: FlashAir Sync needs to connect to your FlashAir SD card over local Wi-Fi.
         # FlashAir (and the local mock server) speak cleartext HTTP. ATS blocks
         # that by default. NSAllowsLocalNetworking permits cleartext to localhost,
@@ -118,13 +197,29 @@ targets:
         SentryDSN: https://fcc743bcc1e56d3f3d852fa8d2ae09fc@o4510950028279809.ingest.us.sentry.io/4511510747676672
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.flashairsync
+        PRODUCT_BUNDLE_IDENTIFIER: us.v9n.flashair-sync
         PRODUCT_NAME: FlashAirSync
         CODE_SIGN_ENTITLEMENTS: FlashAirSync/FlashAirSync.entitlements
-        TARGETED_DEVICE_FAMILY: "1,2"  # iPhone + iPad
+        # iPhone only for v1.0 (decided 2026-08-13). This was "1,2", but the
+        # SwiftUI layout has never been run on an iPad — see CLAUDE.md, every
+        # real-hardware session to date is iPhone. Shipping iPad would add a
+        # mandatory 13" iPad screenshot set (2064x2752) and a review surface
+        # where an untested layout bug becomes a 2.1 crash rejection.
+        # Revisit for 1.1 after actually running it on an iPad; the
+        # UISupportedInterfaceOrientations~ipad key above is retained (inert
+        # while this is "1") so the flip back is a one-line change.
+        TARGETED_DEVICE_FAMILY: "1"  # iPhone only
         SUPPORTS_MACCATALYST: false
+        # Local-build defaults only. CI overrides both on the xcodebuild
+        # command line — see the CFBundle*Version comment above.
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
+        # XcodeGen does not set this, and the asset catalog alone is not
+        # enough: without it the icon still compiles into Assets.car but
+        # CFBundleIconName is never written, and App Store Connect rejects
+        # the upload *after* a green archive. Names the set in
+        # FlashAirSync/Assets.xcassets/AppIcon.appiconset.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     postBuildScripts:
       # Inject git commit hash + build timestamp into the BUILT BUNDLE's
       # Info.plist (not the source — keeps the source tree clean so we
@@ -162,8 +257,12 @@ targets:
       - target: FlashAirSync
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.flashairsync.tests
+        PRODUCT_BUNDLE_IDENTIFIER: us.v9n.flashair-sync.tests
         # Let Xcode synthesize the test bundle's Info.plist (Apple-recommended);
         # without this the test target can't code-sign and `xcodebuild test` fails.
         GENERATE_INFOPLIST_FILE: YES
+        # Match the app target (iPhone-only, see the app's settings above).
+        # Without this the test bundle inherits XcodeGen's "1,2" default while
+        # its TEST_HOST is "1" — an asymmetry nothing has ever exercised.
+        TARGETED_DEVICE_FAMILY: "1"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/FlashAirSync.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FlashAirSync"

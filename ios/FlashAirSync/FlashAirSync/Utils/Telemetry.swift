@@ -5,9 +5,13 @@ import Sentry
 /// instead of importing `Sentry` directly, so we keep SDK-specific knowledge
 /// in one place and can stub it for tests.
 ///
-/// **Telemetry is opt-in.** Nothing leaves the device until the user flips the
-/// Settings -> Privacy toggle. Even with the toggle on we configure Sentry
-/// conservatively for a personal photo app:
+/// **Telemetry is opt-OUT, and the default is ON.** `startIfEnabled()` below
+/// guards on `telemetryEnabled != false`, so both `nil` (the user has never
+/// touched the toggle) and `true` start the SDK; only an explicit `false`, set
+/// at Settings -> Privacy, keeps it off. `PRIVACY.md` is the published
+/// statement of this and is the text to keep in sync — an earlier version of
+/// this comment said "opt-in", which the code has never done. Even with the
+/// toggle on we configure Sentry conservatively for a personal photo app:
 ///   - no Session Replay (records UI — too invasive)
 ///   - no `attachScreenshot` / `attachViewHierarchy` (could capture photos)
 ///   - `sendDefaultPii = false` (no IP / user info)
@@ -16,7 +20,16 @@ import Sentry
 /// What gets sent when enabled: crash reports, app-hang events,
 /// `FlashAirError`-derived events, breadcrumbs from `Logger.shared`, and one
 /// `sync_completed` event per finished sync containing only aggregate
-/// counts/durations. No filenames, no photo content, no personal info.
+/// counts/durations. No photo content, no accounts, no passphrase.
+///
+/// **Do not claim "no filenames" here.** Error events captured elsewhere do
+/// carry them: `Core/SyncEngine.swift` attaches the failing file's name and its
+/// absolute path on the card to every per-file failure, `ImportViewModel`
+/// attaches the card's host address, and `Logger.shared` bridges every log line
+/// (SSID included) into the breadcrumb trail. That is deliberate — a download
+/// failure isn't diagnosable without it — and `PRIVACY.md` discloses it. Keep
+/// this comment, `PRIVACY.md`, and the App Privacy answers saying the same
+/// thing; `PRIVACY.md` is the one that is published.
 enum Telemetry {
 
     // MARK: - Lifecycle

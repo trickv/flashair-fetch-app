@@ -1,0 +1,141 @@
+name: iOS Build
+
+# Deliberately a separate workflow rather than a job inside ci.yml: every job in
+# ci.yml is ubuntu-latest, and macOS minutes bill at 10x. Keeping this in its own
+# file lets a `paths:` filter hold macOS off Android-only and docs-only changes.
+# ci.yml is otherwise untouched — including its known-failing op=104 mock-server
+# step, which is unrelated to iOS.
+#
+# Caveat if you ever make this a required status check: a paths-filtered workflow
+# reports "skipped", not "success", on PRs that don't touch ios/.
+#
+# No secrets, no signing, no DEVELOPMENT_TEAM. Everything here builds unsigned.
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-build.yml'
+  push:
+    branches: [ main, 'claude/**' ]
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-build.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios-build-test:
+    name: iOS Build & Test (unsigned)
+    # Same runner as release.yml so a green PR means something about the build
+    # that will actually ship. macos-26 defaults to Xcode 26.x — deliberately
+    # unpinned; see the rationale in release.yml.
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Show toolchain
+      run: |
+        xcodebuild -version
+        echo "iOS Simulator SDK: $(xcrun --sdk iphonesimulator --show-sdk-version)"
+
+    - name: Install XcodeGen
+      env:
+        HOMEBREW_NO_AUTO_UPDATE: '1'
+        HOMEBREW_NO_INSTALL_CLEANUP: '1'
+      run: |
+        brew install xcodegen
+        xcodegen --version
+
+    # The .xcodeproj is gitignored; nothing below exists until this runs.
+    - name: Generate Xcode project
+      working-directory: ios/FlashAirSync
+      run: xcodegen generate
+
+    # Info.plist is machine-generated from project.yml but *is* committed, so it
+    # can drift when someone edits project.yml and forgets to regenerate. A stale
+    # plist doesn't break the shipped build (release.yml regenerates too) — it
+    # only dirties the tree there, stamping GitCommitHash as "<sha>-dirty".
+    # That's cosmetic, and this check can also trip purely on a CI/local XcodeGen
+    # version difference, so it warns rather than failing the job.
+    - name: Check committed Info.plist is in sync with project.yml
+      run: |
+        if git diff --quiet -- ios/FlashAirSync/FlashAirSync/Info.plist; then
+          echo "Info.plist matches project.yml"
+        else
+          echo "::warning file=ios/FlashAirSync/project.yml::Info.plist is stale. Run 'cd ios/FlashAirSync && xcodegen generate' and commit the result."
+          git --no-pager diff -- ios/FlashAirSync/FlashAirSync/Info.plist
+        fi
+
+    # `xcodebuild test` rejects a generic destination ("Tests must be run on a
+    # concrete device"), and hardcoding a device name rots when the image drops a
+    # simulator. Resolve a UDID at runtime instead. jq is preinstalled.
+    - name: Pick an available iPhone simulator
+      run: |
+        set -euo pipefail
+        UDID=$(xcrun simctl list devices available --json \
+          | jq -r '[.devices | to_entries[]
+                    | select(.key | test("iOS"))
+                    | .value[]
+                    | select(.name | startswith("iPhone"))] | last | .udid')
+        if [ -z "$UDID" ] || [ "$UDID" = "null" ]; then
+          echo "::error::no available iPhone simulator on this runner"
+          xcrun simctl list devices available
+          exit 1
+        fi
+        echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
+        xcrun simctl list devices available | grep -F "$UDID"
+
+    # No CODE_SIGNING_ALLOWED=NO here on purpose: the simulator signs ad-hoc, which
+    # applies FlashAirSync.entitlements without needing a profile or a team, and the
+    # test bundle needs to be signed at all to be injected into the host app.
+    # Disabling signing outright is what breaks `xcodebuild test`, not what fixes it.
+    #
+    # `set -o pipefail` is load-bearing: GitHub's default shell is `bash -e {0}`,
+    # which does NOT set pipefail, so a failing xcodebuild piped into xcbeautify
+    # would otherwise exit 0. xcbeautify is preinstalled on the image.
+    - name: Build & test (simulator)
+      working-directory: ios/FlashAirSync
+      run: |
+        set -o pipefail
+        xcodebuild test \
+          -project FlashAirSync.xcodeproj \
+          -scheme FlashAirSync \
+          -configuration Debug \
+          -destination "platform=iOS Simulator,id=${SIM_UDID}" \
+          -derivedDataPath build \
+          -resultBundlePath "$RUNNER_TEMP/FlashAirSync.xcresult" \
+          | xcbeautify --renderer github-actions
+
+    # Compiling against the device SDK catches arm64-only breakage and Info.plist /
+    # entitlements processing errors that the simulator slice never exercises.
+    # Unsigned, so it needs no secrets. This is a hard gate — a device build that
+    # cannot compile is not something to discover at release time.
+    - name: Build for device SDK (Release, unsigned)
+      working-directory: ios/FlashAirSync
+      run: |
+        set -o pipefail
+        xcodebuild build \
+          -project FlashAirSync.xcodeproj \
+          -scheme FlashAirSync \
+          -configuration Release \
+          -destination 'generic/platform=iOS' \
+          -derivedDataPath build \
+          CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+          | xcbeautify --renderer github-actions
+
+    - name: Upload xcresult bundle on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: FlashAirSync-xcresult
+        path: ${{ runner.temp }}/FlashAirSync.xcresult
+        if-no-files-found: ignore
+        retention-days: 7

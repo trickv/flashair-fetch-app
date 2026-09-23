@@ -6,7 +6,7 @@
 > This project was generated through AI-assisted development ("vibe coding"). The codebase is **partially tested** and should still be considered **experimental**.
 >
 > **Current Status (Updated 2026-06-05):**
-> - ✅ **iOS:** Full M2 sync path **validated end-to-end against real Toshiba FlashAir hardware** (2026-05-29). Full-card stress test on 2026-05-31: **170 files / 0 failures / ~9m39s** at ~10.6 Mbps. Dedupe-at-scale verified by a back-to-back re-sync ("170 already synced, 0 new"). Original filenames preserved into Photos (Immich-friendly). Opt-in Sentry telemetry default-on for the beta. See `docs/REAL-WORLD-FINDINGS.md` for detail.
+> - ✅ **iOS:** Full M2 sync path **validated end-to-end against real Toshiba FlashAir hardware** (2026-05-29). Full-card stress test on 2026-05-31: **170 files / 0 failures / ~9m39s** at ~10.6 Mbps. Dedupe-at-scale verified by a back-to-back re-sync ("170 already synced, 0 new"). Original filenames preserved into Photos (Immich-friendly). Opt-out Sentry telemetry, on by default for the beta. See `docs/REAL-WORLD-FINDINGS.md` for detail.
 > - ⚠️ **Android:** M2 stack (`WiFiConnector`, `MediaStoreWriter`, `SyncEngine`, progress UI, retry, debug/release variants) is merged on `main` and CI is green, but only the **M1 directory-listing path** has been run on the emulator. Real-hardware validation pending. iOS validation gives high confidence the core protocol/strategy is right — the gap is platform glue only.
 > - ⚠️ **Mock-server CI regression:** the `op=104` config-endpoint test fails after M2's `server.py` edits. Android build/test still pass.
 > - ⚠️ **M3 (resilience):** not started — see `TODO.md`.
@@ -68,6 +68,9 @@ open FlashAirSync.xcodeproj
 
 See `docs/BETA-TESTING.md` for the full pre-submission checklist
 (release notes template, privacy defaults, entitlements, etc.).
+See `docs/APP-STORE-RELEASE.md` for the actual release procedure —
+App Store Connect setup, signing secrets, and the tag-driven
+fastlane + GitHub Actions pipeline that ships builds to TestFlight.
 
 ### Android App
 

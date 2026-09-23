@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  App privacy manifest (ITMS-91053).
+
+  This file MUST land at the root of FlashAirSync.app — that is the only place
+  Apple's upload scanner looks. It gets there via project.yml's explicit
+  `buildPhase: resources` entry; the Copy Resources phase flattens it out of the
+  FlashAirSync/ source directory. Verify after any project change with:
+      unzip -l FlashAirSync.ipa | grep xcprivacy      # or
+      ls "$BUILT_PRODUCTS_DIR/FlashAirSync.app/PrivacyInfo.xcprivacy"
+
+  Why the app needs its own manifest even though Sentry ships one: the `Sentry`
+  SPM product resolves to a *static* xcframework, and it is linked straight into
+  our Mach-O — verified on a Release device build, where `nm FlashAirSync` finds
+  148 SentrySDK symbols and `otool -L FlashAirSync` lists no Sentry load command
+  at all. (There IS a Frameworks/Sentry.framework in the bundle, but it is a
+  33 KB stub dylib with zero exported symbols and MinimumOSVersion 100.0 — a
+  carrier for Sentry's own manifest, not the SDK.) Required-reason API scanning
+  is per-Mach-O: Sentry's symbols are inside *our* binary, so every category
+  Sentry declares has to be repeated here under our name. Relying on the stub to
+  cover us is the failure mode this file exists to prevent.
+
+  Keep this in sync with PRIVACY.md and with the App Privacy answers in
+  App Store Connect (docs/APP-STORE-RELEASE.md step 14).
+-->
+<plist version="1.0">
+<dict>
+  <!-- No tracking, no data broker, no cross-app linkage. No tracking domains,
+       so ATT is not required and nothing needs to be listed here. -->
+  <key>NSPrivacyTracking</key>
+  <false/>
+  <key>NSPrivacyTrackingDomains</key>
+  <array/>
+
+  <!--
+    What actually leaves the device, and only when diagnostics are enabled
+    (Settings -> Privacy; default ON / opt-out — see Utils/Telemetry.swift).
+    Everything below is Sentry traffic; the photos themselves never leave the
+    device except to the user's own Photos library.
+  -->
+  <key>NSPrivacyCollectedDataTypes</key>
+  <array>
+    <!-- Crash reports + app-hang events (options.enableCrashHandler,
+         options.enableAppHangTracking in Telemetry.start()). -->
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeCrashData</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+
+    <!-- Performance traces (tracesSampleRate = 0.2) and the aggregate
+         sync_completed event's durations/throughput. -->
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypePerformanceData</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+
+    <!-- Everything else on an error event: breadcrumbs bridged from
+         Logger.shared, and the per-file failure extras in Core/SyncEngine.swift
+         (file name, card path, expected size) plus the card host in
+         Features/Import/ImportViewModel.swift. Filenames and card paths DO
+         travel with failure events — PRIVACY.md discloses this explicitly. -->
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeOtherDiagnosticData</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+
+    <!-- The honest one. The app has no accounts and asks for no identity, but
+         sentry-cocoa attaches a random per-install UUID as `user.id` to every
+         event (SentryClient.m `setUserIdIfNoUserSet`, backed by
+         SentryInstallation's file in the app's cache directory). It is NOT
+         gated by sendDefaultPii, it is not the IDFA/IDFV, and it dies with the
+         app container — but it is a persistent identifier we transmit, so it is
+         declared rather than argued about. Linked = false (we hold no account
+         to link it to), Tracking = false (never joined with third-party data,
+         never used for ads). -->
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeUserID</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+  </array>
+
+  <!--
+    Required-reason APIs. Exactly three families are reachable from this
+    binary; disk space and active keyboards are NOT used by either the app or
+    Sentry and are deliberately absent (declaring unused categories is its own
+    kind of dishonesty).
+  -->
+  <key>NSPrivacyAccessedAPITypes</key>
+  <array>
+    <!-- Ours: Utils/Extensions.swift (UserDefaults.syncSettings),
+         Features/Settings/SettingsView.swift, Features/Import/ImportViewModel.swift,
+         Utils/Telemetry.swift. Also Sentry's. CA92.1 = "access information
+         accessible only to the app itself" — there is no App Group here. -->
+    <dict>
+      <key>NSPrivacyAccessedAPIType</key>
+      <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key>
+      <array>
+        <string>CA92.1</string>
+      </array>
+    </dict>
+
+    <!-- Ours: FileManager.attributesOfItem(atPath:) in Core/SyncIndex.swift and
+         Core/FlashAirClient.swift, which goes through stat(2). We read [.size]
+         to verify downloaded byte counts, not timestamps, but the scanner keys
+         off the syscall. Also Sentry's. C617.1 = "metadata of files inside the
+         app container" — which is exactly what those temp files are. -->
+    <dict>
+      <key>NSPrivacyAccessedAPIType</key>
+      <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key>
+      <array>
+        <string>C617.1</string>
+      </array>
+    </dict>
+
+    <!-- Not ours — no Swift source in this app touches boot time. This is the
+         statically-linked Sentry code, which declares 35F9.1 in its own manifest
+         but whose symbols the scanner attributes to our binary (see the header).
+         35F9.1 = "measure elapsed time between in-app events". Remove this only
+         if the Sentry dependency is removed. -->
+    <dict>
+      <key>NSPrivacyAccessedAPIType</key>
+      <string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key>
+      <array>
+        <string>35F9.1</string>
+      </array>
+    </dict>
+  </array>
+</dict>
+</plist>

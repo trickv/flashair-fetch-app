@@ -14,7 +14,7 @@ open FlashAirSync.xcodeproj
 In Xcode, before the first build:
 
 1. Select the `FlashAirSync` target → **Signing & Capabilities** → set **Team** to your Apple Developer team. Without this you'll get a `Signing for FlashAirSync requires a development team` error.
-2. (Optional) Change the bundle identifier in `project.yml` if `com.flashairsync` collides with another app in your developer account.
+2. Leave the bundle identifier alone. It is `us.v9n.flashair-sync`, and it is load-bearing rather than cosmetic: the `flashair-sync` distribution provisioning profile is issued against that exact ID, and `fastlane/Fastfile`, `.github/workflows/release.yml` and the App Store Connect app record all key off it. Changing it invalidates the whole release path — see `docs/APP-STORE-RELEASE.md` steps 2 and 5. (If you are forking this for your own developer account, you *do* change it, but change it everywhere at once.)
 
 ## Changing project settings
 
@@ -24,13 +24,15 @@ Edit `project.yml`, then re-run `xcodegen generate`. Don't change settings insid
 
 `WiFiJoiner` uses `NEHotspotConfiguration` to join the FlashAir's WiFi. That API is gated by the `com.apple.developer.networking.HotspotConfiguration` entitlement (already declared in `FlashAirSync.entitlements`).
 
-For local development on a registered device, the entitlement works as soon as it's in the file. For TestFlight / App Store, Apple has to grant the capability on the bundle ID:
+For local development on a registered device, the entitlement works as soon as it's in the file. For TestFlight / App Store, tick it on the App ID:
 
-1. Apple Developer Portal → Certificates, Identifiers & Profiles → Identifiers → your app ID.
-2. Enable **Hotspot Configuration** under Capabilities.
-3. Regenerate provisioning profiles.
+1. Apple Developer Portal → Certificates, Identifiers & Profiles → Identifiers → `us.v9n.flashair-sync`.
+2. Enable **Hotspot Configuration** under Capabilities, and Save.
+3. Regenerate the `flashair-sync` distribution profile — an existing profile does **not** pick the capability up retroactively.
 
-Apple has been known to deny this capability for hobby apps — worth requesting early, before you've sunk a lot of work into the iOS-specific code paths.
+**This is a self-serve checkbox, not a request.** `com.apple.developer.networking.HotspotConfiguration` is an *unmanaged* entitlement: any paid Apple Developer Program membership can tick it, with no request form and no approval wait. Earlier versions of this file said Apple has to "grant" it and "has been known to deny it for hobby apps" — that was wrong, and it was wrong about a different entitlement. The request-gated, genuinely deniable ones are `NEHotspotHelper` (`…networking.HotspotHelper`) and `…networking.multicast`; this app uses neither.
+
+Order matters: the capability must be on the App ID **before** the distribution profile is generated, or the archive fails at signing. See `docs/APP-STORE-RELEASE.md` step 2 for the full click path and step 5 for profile regeneration.
 
 ## Running against the mock server
 
@@ -49,10 +51,22 @@ FlashAirSync/
     Platform/                    WiFiJoiner (NEHotspot), PhotoSaver (PHPhotoLibrary)
     Features/Import/             ImportView + ImportViewModel
     Features/Settings/           SettingsView
-    Utils/                       Logger, Extensions
-    Info.plist
+    Utils/                       Logger, Extensions, Telemetry (Sentry wrapper)
+    Assets.xcassets/             AppIcon.appiconset — the 1024×1024 App Store icon
+    Info.plist                   GENERATED from project.yml; committed, never hand-edited
     FlashAirSync.entitlements
   FlashAirSyncTests/             XCTest target (CSVParserTests)
+  tools/
+    make-icon.swift              Regenerates AppIcon-1024.png deterministically
 ```
+
+`tools/make-icon.swift` is outside the target's source glob, so it is never compiled into the app — run it by hand, from the repo root, with an output path:
+
+```bash
+xcrun swift ios/FlashAirSync/tools/make-icon.swift \
+  ios/FlashAirSync/FlashAirSync/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png
+```
+
+It exists because the App Store rejects icons with an alpha channel (ITMS-90717), and it bakes that constraint in (`CGImageAlphaInfo.noneSkipLast`) rather than leaving you to strip alpha by hand. The current icon is a placeholder; replace the drawing code, re-run, and the output stays submission-legal.
 
 Mirror this against the Android tree in `android/app/src/main/java/com/flashairsync/` — they're meant to stay in rough sync. The Android side currently has M2 work that hasn't been mirrored to Swift yet; see the parity report in `CLAUDE.md` / sessions notes.
