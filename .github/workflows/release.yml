@@ -219,8 +219,12 @@ jobs:
         INPUT_NOTES: ${{ inputs.notes }}
       run: |
         set -euo pipefail
-        # The body arrives via env, never as an inline ${{ }} substitution, so
-        # quotes/backticks/$(...) in a release body cannot break the shell parse.
+        # The body arrives via env, never as an inline expression substitution,
+        # so quotes/backticks/$(...) in a release body cannot break the shell
+        # parse. Do not write that construct literally here even in a comment:
+        # GitHub evaluates expressions anywhere in a run block, comments
+        # included, and an empty one is a parse error that invalidates the
+        # whole workflow file (which is exactly how this line first shipped).
         # No byte truncation here: pilot enforces Apple's 4000-char "What to Test"
         # limit itself, and byte-slicing UTF-8 is how baby-monitor's Play Store
         # changelog got mangled.

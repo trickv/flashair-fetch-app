@@ -509,7 +509,15 @@ xcodebuild build -scheme FlashAirSync -configuration Release \
   -destination 'generic/platform=iOS' \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
 
-# 2. The tree is clean after generating. If Info.plist shows as modified,
+# 2. The workflows are valid *as workflows*, not merely as YAML. GitHub
+#    evaluates ${ {  } }-style expressions anywhere in a run block — comments
+#    included — so a file can parse as perfect YAML and still be rejected
+#    wholesale, showing up in the Actions tab as a 0-second failure named
+#    after the file path instead of its `name:`. This happened on the very
+#    first push of release.yml.  brew install actionlint
+actionlint ../../.github/workflows/*.yml
+
+# 3. The tree is clean after generating. If Info.plist shows as modified,
 #    someone edited project.yml without regenerating — commit the plist,
 #    or every shipped build gets stamped GitCommitHash "<sha>-dirty".
 git -C ../.. status --porcelain
