@@ -40,7 +40,7 @@ The app's telemetry is **default ON** for beta testers (commit
 `dfa3885`). Disclose this in your TestFlight release notes:
 
 > This beta sends anonymous crash reports and sync metrics (file
-> counts, durations, success/failure) to help us improve the app. No
+> counts, durations, success/failure) to help me improve the app. No
 > photo content and no personal information; if an individual file
 > fails to download, its filename is included so the failure is
 > actionable. Toggle off at any time via Settings → Privacy.
@@ -148,9 +148,9 @@ Known limitations
 - Long syncs (full card) take ~10 minutes — keep the app open
 
 Privacy
-- Anonymous crash reports and sync metrics are sent to Sentry to help us
+- Anonymous crash reports and sync metrics are sent to Sentry to help me
   improve the app. No photo content and no personal info. If a file fails
-  to download, its filename is included so we can chase the bug.
+  to download, its filename is included so I can chase the bug.
 - Toggle off via Settings → Privacy at any time.
 - Full policy: https://github.com/trickv/flashair-fetch-app/blob/main/PRIVACY.md
 
