@@ -284,7 +284,7 @@ Only if you need a new one:
 | Field | Value |
 |---|---|
 | Platforms | ☑ **iOS** only |
-| Name | from 0.1 — neutral, ≤30 chars, globally unique across the whole App Store |
+| Name | **`FlashAir Sync`** per the decision in 0.1 (kept, with trademark attribution). ≤30 chars, and must be globally unique across the whole App Store — if it is taken, fall back to the neutral option in 0.1 rather than inventing a variant here |
 | Primary Language | English (U.S.) |
 | Bundle ID | **`us.v9n.flashair-sync`** — only appears if step 2 completed; portal→ASC sync takes a few minutes, hard-refresh if missing |
 | SKU | `flashair-sync` (internal, immutable, never shown) |
