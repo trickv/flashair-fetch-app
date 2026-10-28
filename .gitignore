@@ -79,6 +79,22 @@ fastlane/test_output
 # comment in Gemfile for the tradeoff.
 Gemfile.lock
 
+# Signing material — NEVER commit. These land in the working directory while
+# following docs/APP-STORE-RELEASE.md (cert export, provisioning profile, the
+# App Store Connect .p8, and any scratch file holding a password). They are
+# credentials for the whole Apple team, not just this app: a leaked .p12 plus
+# its password lets anyone sign software as you. They go into GitHub secrets
+# and are then deleted from disk — these rules exist so a stray `git add -A`
+# during that window can't publish them to a public repo.
+*.p12
+*.mobileprovision
+*.provisionprofile
+*.cer
+*.certSigningRequest
+*.p8
+P12_PASSWORD
+KEYCHAIN_PASSWORD
+
 # Editor
 .vscode/
 .idea/
