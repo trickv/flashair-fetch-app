@@ -15,6 +15,68 @@ actor FlashAirClient {
         self.session = URLSession(configuration: config)
     }
 
+    // MARK: - Reachability
+
+    /// URLError codes that mean "no route to the card *yet*" rather than a
+    /// real failure. Seen in the wild right after a Wi-Fi join, before iOS has
+    /// moved the default route onto the FlashAir interface.
+    private static let transientConnectivityCodes: Set<URLError.Code> = [
+        .notConnectedToInternet,   // -1009: NWPath unsatisfied, "No network route"
+        .cannotConnectToHost,      // -1004
+        .timedOut,                 // -1001
+        .networkConnectionLost,    // -1005
+        .cannotFindHost,           // -1003
+        .dataNotAllowed,           // -1020
+    ]
+
+    /// Block until the card answers an HTTP request, or `timeout` elapses.
+    ///
+    /// `NEHotspotConfigurationManager.apply()` returns as soon as iOS accepts
+    /// the configuration — not when the Wi-Fi interface can carry traffic.
+    /// Firing the first listing immediately after the join failed with -1009
+    /// ("The Internet connection appears to be offline", NWPath "No network
+    /// route") within ~5ms on most attempts (Sentry FLASHAIR-FETCH-APP-4).
+    /// This polls a cheap root listing on a short per-attempt timeout until
+    /// the route is up. `waitsForConnectivity` isn't used instead because it
+    /// waits out the whole 300s resource timeout when the card is genuinely
+    /// absent.
+    ///
+    /// - Throws: `FlashAirError.cardUnreachable` on deadline; non-transient
+    ///   errors (bad HTTP status, cancellation, …) are rethrown immediately.
+    func waitUntilReachable(timeout: TimeInterval = 20) async throws {
+        guard let url = URL(string: "\(host)/command.cgi?op=100&DIR=/") else {
+            throw FlashAirError.invalidResponse
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 3
+
+        let deadline = Date().addingTimeInterval(timeout)
+        var attempt = 0
+        while true {
+            attempt += 1
+            do {
+                let (_, response) = try await session.data(for: request)
+                guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                    throw FlashAirError.invalidResponse
+                }
+                if attempt > 1 {
+                    await Logger.shared.logInfo("Card reachable after \(attempt) attempts")
+                }
+                return
+            } catch let error as URLError where Self.transientConnectivityCodes.contains(error.code) {
+                print("⏳ Card not reachable yet (attempt \(attempt), \(error.code.rawValue))")
+                await Logger.shared.logWarning("Card not reachable yet (attempt \(attempt), URLError \(error.code.rawValue))")
+                guard Date() < deadline else {
+                    throw FlashAirError.cardUnreachable(host: host)
+                }
+                // Short, slightly growing backoff: route usually appears within a
+                // second or two of the join.
+                let delay = min(0.25 * Double(attempt), 1.0)
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            }
+        }
+    }
+
     // MARK: - Directory Listing
 
     /// List directory contents via command.cgi?op=100

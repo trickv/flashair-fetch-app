@@ -96,6 +96,28 @@ session. Document the trade-off:
 - **Drop the teardown** → no repeat prompt, but the phone is "stuck"
   on the FlashAir network until iOS auto-switches.
 
+## `apply()` returning ≠ the card being reachable (iOS)
+
+`NEHotspotConfigurationManager.apply()` completes when iOS accepts the
+configuration, **not** when traffic can flow over the new interface.
+Through Oct 2026 the first `/DCIM` listing — fired ~5–50ms after
+`apply()` returned — failed most of the time with
+`NSURLErrorDomain -1009` "The Internet connection appears to be
+offline" (NWPath `unsatisfied (No network route)`; Sentry
+FLASHAIR-FETCH-APP-4, 13 failures in one morning). Breadcrumbs showed
+device connectivity still reporting `cellular` at that point; a
+successful attempt minutes later only flipped to `wifi` ~3s after the
+join.
+
+Fix (2026-10-28): `FlashAirClient.waitUntilReachable` polls
+`op=100&DIR=/` on a 3s per-attempt timeout, retrying -1009/-1004/
+-1001/-1005/-1003/-1020 with a short backoff for up to 20s, then
+fails with our own "couldn't reach the card" message.
+`waitsForConnectivity = true` was rejected because it waits out the
+full 300s resource timeout when the card really is absent. Android's
+`WifiNetworkSpecifier` path binds to the network in `onAvailable`, so
+it may not have the same race; unverified.
+
 ## The iOS "Connection Assistant" prompt during sync
 
 Mid-sync, iOS sometimes pops a **"FlashAir has no internet, switch?"**

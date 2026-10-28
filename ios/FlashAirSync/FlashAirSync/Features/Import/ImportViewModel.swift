@@ -79,6 +79,13 @@ class ImportViewModel: ObservableObject {
                 try await wifiJoiner.joinNetwork(ssid: ssid, passphrase: settings.passphrase)
                 print("📶 Joined \"\(ssid)\"")
                 await Logger.shared.logInfo("Joined \(ssid)")
+
+                // The join returning doesn't mean the route to the card is up
+                // yet — wait for it before the first listing (see
+                // FlashAirClient.waitUntilReachable).
+                currentPhase = "Waiting for card at \(settings.host)..."
+                try await FlashAirClient(host: settings.host).waitUntilReachable()
+                await Logger.shared.logInfo("Card reachable at \(settings.host)")
             } else {
                 await Logger.shared.logWarning("Skipping Wi-Fi connection (using mock server)")
             }

@@ -211,6 +211,9 @@ enum FlashAirError: LocalizedError {
     /// partial response as success. Thrown before any Photos save so we
     /// never commit a truncated file to the library.
     case sizeMismatch(path: String, expected: Int, actual: Int)
+    /// Joined the card's Wi-Fi, but no HTTP request reached it before the
+    /// reachability deadline in `FlashAirClient.waitUntilReachable`.
+    case cardUnreachable(host: String)
 
     var errorDescription: String? {
         switch self {
@@ -230,6 +233,8 @@ enum FlashAirError: LocalizedError {
             return "Failed to connect to FlashAir Wi-Fi network"
         case .sizeMismatch(let path, let expected, let actual):
             return "Truncated download of \(path): expected \(expected) bytes, got \(actual). The camera may have gone to sleep mid-transfer."
+        case .cardUnreachable(let host):
+            return "Joined the FlashAir Wi-Fi but couldn't reach the card at \(host). Make sure the camera is on and awake, then try again."
         }
     }
 }
