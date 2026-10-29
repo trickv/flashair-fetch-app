@@ -62,7 +62,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         # project.yml's postBuildScripts stamps `git describe --always --dirty`
         # into the built bundle (shown in Settings → About). The default shallow
@@ -271,7 +271,7 @@ jobs:
 
     - name: Attach IPA and dSYMs to the GitHub Release
       if: github.event_name == 'release'
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         # dSYMs are attached because this app ships Sentry; without archived
         # dSYMs every TestFlight crash report is unsymbolicated hex.
@@ -284,7 +284,7 @@ jobs:
     # A workflow_dispatch run has no release to attach assets to.
     - name: Upload IPA and dSYMs as artifacts (manual runs)
       if: github.event_name == 'workflow_dispatch'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: FlashAirSync-ipa
         path: |
