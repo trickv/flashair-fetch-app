@@ -19,7 +19,7 @@
 - ⚠️ Debug/release **build variants**: `debug` points at the mock server (`10.0.2.2:8080`) and skips the WiFi join; `release` points at the real FlashAir (`192.168.0.1`, SSID `flashair`). See `android/app/build.gradle.kts` `buildTypes`.
 
 **Known Regressions on `main`:**
-- ❌ Mock-server CI step `Test config endpoint` (`op=104`) fails after M2's `tools/mock-flashair/server.py` changes. Android build/test still pass.
+- ✅ Mock-server CI step `Test config endpoint` (`op=104`) passes (confirmed 2026-10-29). Previously recorded here as failing since 2026-05-18, but `server.py` never changed and no CI run on record is red on it.
 
 **iOS — full sync validated against mock (2026-05-27), real Toshiba FlashAir hardware (2026-05-29), AND full-card stress test (2026-05-31):**
 - ✅ First built & run on Xcode 26.5 (iOS 16 deployment target)
@@ -204,7 +204,7 @@ The Android M2 code is merged but unexercised. The natural progression:
    - Run a sync from `MainActivity` and confirm files land in `Pictures/FlashAirImport/`.
    - Re-run; confirm `SyncIndex` dedupes to 0 new files.
 
-2. **Fix the mock-server `op=104` regression** in `tools/mock-flashair/server.py` so CI goes green.
+2. ~~Fix the mock-server `op=104` regression~~ — not reproducible; CI is green. Removed from the punch list 2026-10-29.
 
 3. **Validate against real FlashAir hardware (release build)**
    - Use SSID `flashair`, host `http://192.168.0.1`. Permission flow for `NEARBY_WIFI_DEVICES` (Android 13+) or `ACCESS_FINE_LOCATION` (10–12) needs real-world testing.

@@ -8,7 +8,7 @@
 > **Current Status (Updated 2026-06-05):**
 > - ✅ **iOS:** Full M2 sync path **validated end-to-end against real Toshiba FlashAir hardware** (2026-05-29). Full-card stress test on 2026-05-31: **170 files / 0 failures / ~9m39s** at ~10.6 Mbps. Dedupe-at-scale verified by a back-to-back re-sync ("170 already synced, 0 new"). Original filenames preserved into Photos (Immich-friendly). Opt-out Sentry telemetry, on by default for the beta. See `docs/REAL-WORLD-FINDINGS.md` for detail.
 > - ⚠️ **Android:** M2 stack (`WiFiConnector`, `MediaStoreWriter`, `SyncEngine`, progress UI, retry, debug/release variants) is merged on `main` and CI is green, but only the **M1 directory-listing path** has been run on the emulator. Real-hardware validation pending. iOS validation gives high confidence the core protocol/strategy is right — the gap is platform glue only.
-> - ⚠️ **Mock-server CI regression:** the `op=104` config-endpoint test fails after M2's `server.py` edits. Android build/test still pass.
+> - ✅ **CI is green**, including the `op=104` config-endpoint test. An earlier note here claimed it was failing; it is not.
 > - ⚠️ **M3 (resilience):** not started — see `TODO.md`.
 >
 > **Use at your own risk.** Expect bugs and breaking changes.

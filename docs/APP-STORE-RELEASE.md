@@ -1332,7 +1332,7 @@ Three workflows exist and they are easy to confuse:
 
 | File | Runs on | What red means |
 |---|---|---|
-| `ci.yml` | every push/PR, ubuntu | Android + mock server. Currently red on the `op=104` step; not your problem |
+| `ci.yml` | every push/PR, ubuntu | Android + mock server. Green as of 2026-10-29; not part of the release path either way |
 | `ios-build.yml` | PRs and pushes touching `ios/**`, macOS | Unsigned build + the 8 unit tests. This one *is* about the app that ships. Reports **skipped**, not success, when a PR touches nothing under `ios/` |
 | `release.yml` | a **published** GitHub Release (or `workflow_dispatch`) | The TestFlight upload. Nothing else triggers it |
 
